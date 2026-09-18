@@ -146,9 +146,28 @@ The result contract has exactly three shapes:
 Recovery is separated from failure:
 
 - **Recoverable conditions** (dismiss a known interstitial, wait/retry a transient load, re-auth on session timeout) are handled inline with bounded retries.
-- **Hard failures** (permission denied, unexpected structure, exhausted retries) stop the run, surface a clear error, and — when appropriate — route to human escalation (§7).
+- **Hard failures** (permission denied, unexpected structure, exhausted retries) stop the run, surface a clear error, and — when appropriate — route to human escalation (§8).
 
-## 7. Human-in-the-loop handoff
+## 7. Observability & repair loop
+
+Deterministic replay is cheap enough to run constantly — so every run is *recorded*, *measured*, and *closed-loop repaired*. This is what turns a deterministic executor into something a bank can operate for years.
+
+**Every replay produces a ReplayRun record:** `capability` (name + version), `inputs`, `started_at`, `duration`, and a `result` of `success` / `business_outcome` / `failure`. On failure the record carries the failing step, `expected` vs `observed`, the error classification (recoverable / hard / business), and a screenshot + DOM snapshot for human review. Regulated financial data is never written here (see Safety & guardrails).
+
+**Success telemetry.** Aggregated per capability — and per version, per tenant — as success rate, business-outcome rate, and failure rate, plus the trend over the last N runs. A capability whose success rate suddenly dips is the canary: the target site has drifted and the artifact needs a repair *before* it becomes a support ticket.
+
+**Failure inbox.** Every non-success run lands in a searchable inbox with full context. Each case is **replayable**: "replay this error" re-runs the exact capability + inputs to reproduce the failure deterministically — the maintainer sees what a human would have seen, not a prose summary.
+
+**Repair loop — monitor → diagnose → fix → re-verify:**
+
+1. **Monitor** — telemetry flags a degrading capability.
+2. **Diagnose** — open the failure case, replay the error, read the failing step's expected-vs-observed and screenshot.
+3. **Fix** — two paths: **retry as-is** (suspect a transient) re-runs the same version; **repair + bump** (the site changed) hand-edits the locator (design principle #5) and bumps the version.
+4. **Re-verify** — replay the *original failing inputs* against the fixed version; if it passes, mark the case resolved. The loop closes on evidence, not hope.
+
+**Human oversight.** A CLI exposes the telemetry overview, the failure inbox, and per-case detail (replay / mark-resolved / bump). A human can audit the whole lifecycle — what broke → what I changed → proof it's fixed — which is the operational guarantee banks actually need.
+
+## 8. Human-in-the-loop handoff
 
 A real control-transfer state machine on the **same live session**:
 
@@ -165,28 +184,28 @@ AUTOMATION ──stuck/risky/irreversible──▶ PAUSED ──operator takes o
 
 The operator console is deliberately mocked, but the pause/cede/resume mechanism and the control-ownership model are real.
 
-## 8. Safety & guardrails
+## 9. Safety & guardrails
 
 - **Explicit, configurable allowlist** of permitted domains/routes and permitted action types. The agent cannot act outside it — this is enforced in the agent loop *and* re-checked in replay.
 - **Risky/irreversible actions** (submit, delete, approve) are classified and gated — either blocked outright or routed to human escalation.
 - **Data handling:** regulated financial data is never persisted into artifacts or logs; extracted values are typed and only returned to the caller, never dumped into evidence.
 
-## 9. Heterogeneity & multi-tenant (design only — not built)
+## 10. Heterogeneity & multi-tenant (design only — not built)
 
 - **Surface abstraction:** the artifact schema is surface-agnostic. `action` is a small typed vocabulary (click/type/select/read/wait/assert); `target.strategy` is the only place a concrete surface leaks in. A desktop surface is a new `strategy` + a new driver behind the same engine, not a rewrite.
 - **Cross-tenant reuse:** because we record *intent + locator strategy* (not coordinates), an artifact recorded on one institution's instance of a vendor product can be applied to a second, differently-branded instance — with per-variant overrides where a route or label differs. This is the "canonicalize /12345 → /:id" stretch goal, and it falls out of the schema for free.
 
-## 10. Implementation roadmap
+## 11. Implementation roadmap
 
 - [x] **Phase 1 — mock app.** Build the hostile local legacy app with planted error/outcome states.
 - [x] **Phase 2 — agent loop (discovery).** Playwright + accessibility tree (primary) + K3 vision (fallback) + DeepSeek structured decisions; one real end-to-end run against the mock.
 - [x] **Phase 3 — artifact.** Pydantic schema + serialize the discovery run into a Capability; reviewability + versioning.
-- [ ] **Phase 4 — replay.** Deterministic act→assert→branch engine; the three-state result contract; error/recovery handling.
+- [ ] **Phase 4 — replay.** Deterministic act→assert→branch engine; the three-state result contract; error/recovery handling; every run recorded as a ReplayRun (result + diagnostic + screenshot).
 - [ ] **Phase 5 — safety + escalation + artifact management.** Allowlist enforcement; pause/cede/resume handoff state machine (mocked operator UI); a CLI to list / edit locators / bump version / dry-run replay so a human can keep artifacts current as target sites drift.
-- [ ] **Phase 6 — evidence.** `/evidence/` with a saved artifact, a discovery log, and a replay log — including one replay that hits an error state.
+- [ ] **Phase 6 — evidence & observability.** `/evidence/` with a saved artifact, a discovery log, and a replay log (including one that hits an error); success telemetry, a failure inbox, and the replay-the-error → repair → re-verify loop.
 - [ ] **Phase 7 — REPORT.md.** Distill this document into the seven mandated headings.
 
-## 11. Decision log / status
+## 12. Decision log / status
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
@@ -201,6 +220,7 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 | 2026-09-17 | Phase 3 done: Pydantic `Capability` schema + `serialize` distills a discovery run; terminal markers (done/fail) are dropped, per-step assertion + locator reasoning recorded | typed / versioned / reviewable by construction |
 | 2026-09-17 | Legacy controls can have an empty accessible name (mock textbox has `name=""`) — artifact records role+name but replay needs a fallback chain (role ordinal / adjacent label) | surfaced as a concrete Phase 4 concern |
 | 2026-09-18 | Artifact is explicitly human-manageable — design principle #5 (review/edit/version) + a Phase 5 artifact-management CLI | "the site changed and I know exactly what changed" must be a cheap hand-edit + replay, never a re-discovery |
+| 2026-09-18 | Observability & repair loop (§7): every replay records a ReplayRun; success telemetry flags drift; a failure inbox replays the error; monitor→fix→re-verify closes the loop under human oversight | a deterministic executor becomes operable: drift is caught, diagnosed, repaired, and re-verified on evidence |
 
 ---
 
