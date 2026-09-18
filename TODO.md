@@ -48,7 +48,12 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## 🔜 Next up
 
-**Phase 1 — mock app** (in progress).
+**Phase 2 — Agent loop (discovery)** — the heart of the project.
+
+Resume from here next session:
+1. `pip install playwright` + chromium kernel
+2. observe → decide → act loop: accessibility tree (primary) + DeepSeek structured decisions + K3 vision fallback
+3. one real end-to-end discovery run: search member 1001 → detail → deactivate
 
 ## 📦 Before final submission
 

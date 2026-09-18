@@ -48,7 +48,12 @@
 
 ## 🔜 下一步
 
-**Phase 1 —— mock 应用**（等 K3 API key 确认后即可开工）。
+**Phase 2 —— Agent loop（discovery）**，整个项目的心脏。
+
+明天从这里接着做：
+1. `pip install playwright` + chromium 内核
+2. observe → decide → act 循环：无障碍树（主）+ DeepSeek 结构化决策 + K3 视觉兜底
+3. 跑一次真实端到端 discovery：搜 member 1001 → 看详情 → deactivate
 
 ## 📦 交作业前
 
