@@ -24,6 +24,7 @@ Decide the single next action. Respond with ONLY a JSON object (no markdown, no 
     "value": "text",
     "url": "http://..."
   },
+  "expect": "what the page should show after this action (used later for replay assertions)",
   "goal_reached": false,
   "outputs": {},
   "reason": ""
@@ -33,6 +34,7 @@ Field rules:
 - "index" is required for click/type/select — it is the number from the menu.
 - "value" is required for type (the text to enter) and select (the option).
 - "url" is required for navigate.
+- "expect" describes the expected outcome of this action (e.g. "member detail table visible") — write it for every click/type/navigate.
 - When the goal is satisfied: kind="done", goal_reached=true, and put the extracted results in "outputs".
 - When the page shows an error, denial, or unexpected state: kind="fail" and explain in "reason".
 - Take the smallest correct step. Type into a field before clicking its button.
@@ -76,8 +78,9 @@ def _vision_prompt(task: str) -> str:
     )
 
 
-def _act(page, decision: dict, obs: dict):
-    """Execute a single decided action and return a human-readable description."""
+def _act(page, decision: dict, obs: dict) -> dict:
+    """Execute a single decided action. Returns a structured record
+    {action, target, value, desc} — the raw material for the artifact."""
     action = dict(decision.get("action", {}))
     kind = str(action.get("kind", "")).lower()
     idx = action.get("index")
@@ -85,34 +88,53 @@ def _act(page, decision: dict, obs: dict):
     if kind in ("click", "type", "select") and idx is None:
         raise ValueError(f"decision kind={kind!r} is missing a required 'index'")
 
+    def _target(el) -> dict:
+        # The locator strategy is role+name (accessibility). This is what the
+        # artifact freezes so replay can re-resolve the control without the LLM.
+        return {"strategy": "accessibility", "role": el["role"], "name": el["name"]}
+
     if kind == "click":
         el = obs["elements"][idx - 1]
         el["locator"].click()
-        return f"click [{idx}] {el['role']} \"{el['name']}\""
+        return {
+            "action": "click",
+            "target": _target(el),
+            "value": None,
+            "desc": f"click [{idx}] {el['role']} \"{el['name']}\"",
+        }
 
     if kind == "type":
         el = obs["elements"][idx - 1]
-        # tolerate the LLM naming the field value/text/input interchangeably
         val = action.get("value") or action.get("text") or action.get("input") or ""
         el["locator"].fill(str(val))
-        return f"type [{idx}] {el['role']} \"{el['name']}\" = {val!r}"
+        return {
+            "action": "type",
+            "target": _target(el),
+            "value": str(val),
+            "desc": f"type [{idx}] {el['role']} \"{el['name']}\" = {val!r}",
+        }
 
     if kind == "select":
         el = obs["elements"][idx - 1]
         val = action.get("value") or action.get("text") or ""
         el["locator"].select_option(str(val))
-        return f"select [{idx}] {el['role']} = {val!r}"
+        return {
+            "action": "select",
+            "target": _target(el),
+            "value": str(val),
+            "desc": f"select [{idx}] {el['role']} = {val!r}",
+        }
 
     if kind == "navigate":
         url = action.get("url", "")
         page.goto(url)
-        return f"navigate to {url}"
+        return {"action": "navigate", "target": None, "value": url, "desc": f"navigate to {url}"}
 
     if kind == "wait":
         page.wait_for_timeout(2000)
-        return "wait 2s"
+        return {"action": "wait", "target": None, "value": None, "desc": "wait 2s"}
 
-    return f"{kind} (no-op)"
+    return {"action": kind, "target": None, "value": None, "desc": f"{kind} (no-op)"}
 
 
 def run_discovery(page, task: str, max_steps: int = 20, verbose: bool = True) -> dict:
@@ -136,18 +158,20 @@ def run_discovery(page, task: str, max_steps: int = 20, verbose: bool = True) ->
         ]
         decision = llm.deepseek_decide(messages)
 
-        action = decision.get("action", {})
-        kind = action.get("kind")
         thought = decision.get("thought", "")
 
-        desc = _act(page, decision, obs)
+        act = _act(page, decision, obs)
+        desc = act["desc"]
+        kind = act["action"]
         history.append(f"step {step_no}: {desc}")
 
         steps.append({
             "step": step_no,
-            "kind": kind,
+            "action": kind,
+            "target": act["target"],
+            "value": act["value"],
+            "expect": decision.get("expect", ""),
             "thought": thought,
-            "action_desc": desc,
             "after_url": page.url,
         })
 

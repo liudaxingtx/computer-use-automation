@@ -12,6 +12,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-17 | K3 API key verified — endpoint `api.moonshot.cn`, model `kimi-k3`, vision reads an image, reasoning model |
 | 2026-09-17 | Phase 1 — mock app (`mock-app/server.py`): "Legacy Member Services" with 3 runtime states planted |
 | 2026-09-17 | Phase 2 — agent loop (`agent/`): a11y-tree observation + DeepSeek structured decisions + K3 vision fallback; real end-to-end run (search 1001 → deactivate) in 5 steps |
+| 2026-09-18 | Phase 3 — artifact (`agent/artifact.py`): Pydantic `Capability` schema + `serialize`; typed/versioned/reviewable JSON |
 
 ## 🎯 Roadmap
 
@@ -27,9 +28,9 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ one real end-to-end discovery run against the mock
 
 ### Phase 3 — Artifact
-- ⬜ Pydantic artifact schema (Capability)
-- ⬜ serialize a discovery run → Capability
-- ⬜ versioning + reviewability
+- ✅ Pydantic artifact schema (Capability)
+- ✅ serialize a discovery run → Capability
+- ✅ versioning + reviewability
 
 ### Phase 4 — Deterministic replay
 - ⬜ replay engine: act → assert → branch
@@ -49,11 +50,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## 🔜 Next up
 
-**Phase 3 — Artifact** (the load-bearing schema).
+**Phase 4 — Deterministic replay** (load-bearing wall #2).
 
-1. Pydantic `Capability` schema — meta, inputs, outputs, checkpoint, typed steps
-2. serialize a discovery run → Capability (distill steps + locator strategies from the transcript)
-3. versioning + reviewability (human-readable, diffable)
+1. replay engine: act → assert → branch (consume the Capability, **no LLM in the loop**)
+2. three-state result contract (success / business_outcome / failure)
+3. recoverable vs hard-failure handling + fallback chain for empty-name controls
 
 ## 📦 Before final submission
 

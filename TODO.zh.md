@@ -12,6 +12,7 @@
 | 2026-09-17 | K3 API key 验证通过（端点 cn + 视觉 + 推理模型） |
 | 2026-09-17 | Phase 1 —— mock 应用（`mock-app/server.py`）：Legacy Member Services，埋了 3 个运行时状态 |
 | 2026-09-17 | Phase 2 —— agent loop（`agent/`）：无障碍树观察 + DeepSeek 结构化决策 + K3 视觉兜底；真实端到端（搜 1001 → deactivate）5 步跑通 |
+| 2026-09-18 | Phase 3 —— artifact（`agent/artifact.py`）：Pydantic `Capability` schema + `serialize`；类型化/版本化/可评审 JSON |
 
 ## 🎯 路线图
 
@@ -27,9 +28,9 @@
 - ✅ 对 mock 跑通一次真实端到端 discovery run
 
 ### Phase 3 — Artifact
-- ⬜ Pydantic artifact schema（Capability）
-- ⬜ 把 discovery run 序列化成 Capability
-- ⬜ 版本化 + 可评审
+- ✅ Pydantic artifact schema（Capability）
+- ✅ 把 discovery run 序列化成 Capability
+- ✅ 版本化 + 可评审
 
 ### Phase 4 — 确定性回放
 - ⬜ 回放引擎：操作 → 断言 → 分支
@@ -49,11 +50,11 @@
 
 ## 🔜 下一步
 
-**Phase 3 —— Artifact**（承重 schema）。
+**Phase 4 —— 确定性回放**（承重墙第二道）。
 
-1. Pydantic `Capability` schema —— meta、inputs、outputs、checkpoint、typed steps
-2. 把 discovery run 序列化成 Capability（从 transcript 提炼步骤 + 定位策略）
-3. 版本化 + 可评审（人类可读、可 diff）
+1. 回放引擎：操作 → 断言 → 分支（消费 Capability，**循环里无 LLM**）
+2. 三态结果契约（success / business_outcome / failure）
+3. 可恢复 vs 硬失败处理 + 空 name 控件的 fallback 链
 
 ## 📦 交作业前
 

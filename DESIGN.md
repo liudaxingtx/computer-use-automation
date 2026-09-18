@@ -179,7 +179,7 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 
 - [x] **Phase 1 — mock app.** Build the hostile local legacy app with planted error/outcome states.
 - [x] **Phase 2 — agent loop (discovery).** Playwright + accessibility tree (primary) + K3 vision (fallback) + DeepSeek structured decisions; one real end-to-end run against the mock.
-- [ ] **Phase 3 — artifact.** Pydantic schema + serialize the discovery run into a Capability; reviewability + versioning.
+- [x] **Phase 3 — artifact.** Pydantic schema + serialize the discovery run into a Capability; reviewability + versioning.
 - [ ] **Phase 4 — replay.** Deterministic act→assert→branch engine; the three-state result contract; error/recovery handling.
 - [ ] **Phase 5 — safety + escalation.** Allowlist enforcement; pause/cede/resume handoff state machine (mocked operator UI).
 - [ ] **Phase 6 — evidence.** `/evidence/` with a saved artifact, a discovery log, and a replay log — including one replay that hits an error state.
@@ -197,6 +197,8 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 | 2026-09-17 | Phase 2 done: a11y-tree observation (primary) + DeepSeek structured decisions + K3 vision fallback; one real end-to-end run (search 1001 → detail → deactivate) finished in 5 steps | the loop is real, not sketched |
 | 2026-09-17 | Discovery must tolerate LLM field-name drift — DeepSeek returned `text` where the prompt asked for `value` | confirms the artifact must *freeze* the contract; only deterministic replay enforces it |
 | 2026-09-17 | K3 vision fallback returns understanding **and** coordinates (bbox + center + normalized) on a non-semantic surface | answers "how to locate a control with no a11y node" — vision can point at it; artifact can record image-template / visual locator instead of a DOM locator |
+| 2026-09-17 | Phase 3 done: Pydantic `Capability` schema + `serialize` distills a discovery run; terminal markers (done/fail) are dropped, per-step assertion + locator reasoning recorded | typed / versioned / reviewable by construction |
+| 2026-09-17 | Legacy controls can have an empty accessible name (mock textbox has `name=""`) — artifact records role+name but replay needs a fallback chain (role ordinal / adjacent label) | surfaced as a concrete Phase 4 concern |
 
 ---
 
