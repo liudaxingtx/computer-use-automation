@@ -131,6 +131,7 @@ Capability
 2. **和对话记录解耦。** artifact 是提炼后的、带类型的步骤——人评审和调用 agent 都能读懂，而且哪怕 discovery 时模型反悔了六次，它也不受影响。
 3. **每一步都带 assert。** checkpoint 是每步一个，不只是最后——绝不假设"我点了就等于成了"。
 4. **错误是一等公民。** 每一步声明怎么分类、怎么处理它的失败模式，喂给回放引擎的决策树。
+5. **人可管理 —— 评审、编辑、版本。** artifact 是纯可 diff 的 JSON，人能看到每个定位「为什么这么选」（reasoning），当目标网站变了就改它（改按钮名、改路由）、bump 版本号、再跑一次 dry-run 回放验证——不用重跑昂贵的 discovery。小漂移 = 手改定位；大改动 = 触发一次新 discovery 并评审新版本。artifact 被当成代码对待：有版本、可评审、可修复。
 
 ## 6. 确定性回放 + 错误分类
 
@@ -177,11 +178,11 @@ AUTOMATION ──卡住/危险/不可逆──▶ PAUSED ──操作员接管�
 
 ## 10. 实施 roadmap
 
-- [ ] **Phase 1 — mock 应用。** 建难啃的本地 legacy 应用，埋好错误/结果状态。
-- [ ] **Phase 2 — agent loop（discovery）。** Playwright + 无障碍树（主）+ K3 视觉（兜底）+ DeepSeek 结构化决策；对 mock 跑通一次真实端到端。
-- [ ] **Phase 3 — artifact。** Pydantic schema + 把 discovery 运行序列化成 Capability；可评审 + 版本化。
+- [x] **Phase 1 — mock 应用。** 建难啃的本地 legacy 应用，埋好错误/结果状态。
+- [x] **Phase 2 — agent loop（discovery）。** Playwright + 无障碍树（主）+ K3 视觉（兜底）+ DeepSeek 结构化决策；对 mock 跑通一次真实端到端。
+- [x] **Phase 3 — artifact。** Pydantic schema + 把 discovery 运行序列化成 Capability；可评审 + 版本化。
 - [ ] **Phase 4 — replay。** 确定性 操作→断言→分支 引擎；三态结果契约；错误/恢复处理。
-- [ ] **Phase 5 — 安全 + 升级。** allowlist 强制；暂停/让出/恢复交接状态机（mock 操作员 UI）。
+- [ ] **Phase 5 — 安全 + 升级 + artifact 管理。** allowlist 强制；暂停/让出/恢复交接状态机（mock 操作员 UI）；一个 CLI 用来 列表 / 改定位 / bump 版本 / dry-run 回放，让目标网站漂移时人工能维持 artifact 最新。
 - [ ] **Phase 6 — 证据。** `/evidence/` 放一个 artifact、一份 discovery 日志、一份 replay 日志——含一次命中错误的回放。
 - [ ] **Phase 7 — REPORT.md。** 把本文档提炼成七个规定标题。
 
@@ -193,6 +194,13 @@ AUTOMATION ──卡住/危险/不可逆──▶ PAUSED ──操作员接管�
 | 2026-09-17 | 目标 = 本地难啃 mock，不是公开网站 | 完全掌控错误状态以**证明**分类；无 ToS/限流风险 |
 | 2026-09-17 | 单进程、六模块；不建基础设施 | 题目明确不建议过早扩展 |
 | 2026-09-17 | 栈：Python + Playwright + DeepSeek（决策）+ K3（视觉）+ Pydantic | 成熟、我们熟，K3 补上视觉缺口、免外部 OCR |
+| 2026-09-17 | K3 已验证：端点 `api.moonshot.cn`、模型 `kimi-k3`、视觉能读图（"12345"）、推理模型（`reasoning_content` + `content`） | 视觉兜底现在是落地验证过的，不是假设 |
+| 2026-09-17 | Phase 2 完成：无障碍树观察（主）+ DeepSeek 结构化决策 + K3 视觉兜底；一次真实端到端（搜 1001 → deactivate）5 步跑通 | loop 是真的，不是草图 |
+| 2026-09-17 | discovery 必须容忍 LLM 字段名漂移——DeepSeek 返回了 `text` 而 prompt 要的是 `value` | 印证 artifact 必须**固化**契约；只有确定性回放才能保证一致 |
+| 2026-09-17 | K3 视觉兜底在无语义表面返回理解**和**坐标（bbox + 中心 + 归一化） | 回答了「无语义节点怎么定位」——视觉能指到它；artifact 可记图像模板/视觉定位而非 DOM 定位 |
+| 2026-09-17 | Phase 3 完成：Pydantic `Capability` schema + `serialize` 提炼 discovery run；终点标记（done/fail）被丢弃、每步断言 + 定位 reasoning 记录 | 天生类型化 / 版本化 / 可评审 |
+| 2026-09-17 | legacy 控件 accessible name 可能为空（mock 输入框 `name=""`）——artifact 记 role+name 但回放需要 fallback 链（role 序号 / 相邻标签） | 作为 Phase 4 的具体挑战浮现 |
+| 2026-09-18 | artifact 明确可人工管理——设计原则 #5（评审 / 编辑 / 版本）+ Phase 5 artifact 管理 CLI | 「网站变了且我确切知道变在哪」必须是便宜的手改 + 回放，绝不重跑 discovery |
 
 ---
 
