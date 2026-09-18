@@ -114,6 +114,7 @@ Capability
 └─ steps: [
     {
       action: click | type | select | navigate | read | wait
+      value: "<加密的客户输入，如 member_id>"   # AES-256-GCM；仅回放时解密
       target: {
         strategy: accessibility | text | css | xpath      # + fallback 链
         value: "role=button name='Search'"
@@ -132,6 +133,7 @@ Capability
 3. **每一步都带 assert。** checkpoint 是每步一个，不只是最后——绝不假设"我点了就等于成了"。
 4. **错误是一等公民。** 每一步声明怎么分类、怎么处理它的失败模式，喂给回放引擎的决策树。
 5. **人可管理 —— 评审、编辑、版本。** artifact 是纯可 diff 的 JSON，人能看到每个定位「为什么这么选」（reasoning），当目标网站变了就改它（改按钮名、改路由）、bump 版本号、再跑一次 dry-run 回放验证——不用重跑昂贵的 discovery。小漂移 = 手改定位；大改动 = 触发一次新 discovery 并评审新版本。artifact 被当成代码对待：有版本、可评审、可修复。
+6. **客户数据静态加密。** 用户实际输入的值——会员 ID、姓名、金额、账号——属于客户，不属于我们。artifact 记录某一步的输入值时，写入前先用 per-tenant 密钥做 AES-256-GCM 加密；回放只在用到的那一刻才解密。定位策略（role/name/reasoning）保持明文——那是 UI 结构，不是客户数据——所以 artifact 依然可评审、可修复，而敏感载荷即使对内部操作员也保持不透明。
 
 ## 6. 确定性回放 + 错误分类
 
@@ -188,7 +190,7 @@ AUTOMATION ──卡住/危险/不可逆──▶ PAUSED ──操作员接管�
 
 - **显式、可配置的 allowlist**：允许的域名/路由、允许的动作类型。agent 不能越界——在 agent loop 里强制执行，回放时再查一遍。
 - **危险/不可逆动作**（提交、删除、审批）分类并设卡——要么直接拦，要么转人类升级。
-- **数据处置：** 受监管金融数据绝不写进 artifact 或日志；提取的值带类型、只返回给调用方，绝不 dump 进证据。
+- **数据处置 & 静态加密：** 回放必须复现的客户输入值（会员 ID、姓名、金额）写入 artifact 或 ReplayRun 之前，先用 per-tenant 密钥做 AES-256-GCM 加密；回放只在用到的那一刻解密。密钥来自环境变量 / KMS，绝不进 git、也不和 artifact 存一起。提取出的*输出*（余额、账号）带类型、只返回给调用方、绝不持久化。定位策略保持明文（是 UI 结构，不是客户数据），所以 artifact 依然可评审，而敏感载荷即使对内部操作员也保持不透明。
 
 ## 10. 异构与多租户（仅设计——不建）
 
@@ -221,6 +223,7 @@ AUTOMATION ──卡住/危险/不可逆──▶ PAUSED ──操作员接管�
 | 2026-09-17 | legacy 控件 accessible name 可能为空（mock 输入框 `name=""`）——artifact 记 role+name 但回放需要 fallback 链（role 序号 / 相邻标签） | 作为 Phase 4 的具体挑战浮现 |
 | 2026-09-18 | artifact 明确可人工管理——设计原则 #5（评审 / 编辑 / 版本）+ Phase 5 artifact 管理 CLI | 「网站变了且我确切知道变在哪」必须是便宜的手改 + 回放，绝不重跑 discovery |
 | 2026-09-18 | 可观测性 + 修复闭环（§7）：每次回放记录 ReplayRun；成功率统计标记漂移；失败案例库回放错误；监控→修复→复查 在人工监察下闭环 | 确定性执行器变得可运营：漂移被抓住、诊断、修复、并靠证据复查 |
+| 2026-09-18 | 客户数据静态加密（设计原则 #6 + §9）：step 输入值写入前用 per-tenant 密钥 AES-256-GCM 加密；定位策略保持明文；回放仅在用时解密 | 客户 PII 即使对内部操作员也不透明，而 artifact 仍可评审/可修复 |
 
 ---
 

@@ -114,6 +114,7 @@ Capability
 └─ steps: [
     {
       action: click | type | select | navigate | read | wait
+      value: "<encrypted customer input, e.g. member_id>"  # AES-256-GCM; decrypted only at replay time
       target: {
         strategy: accessibility | text | css | xpath      # + fallback chain
         value: "role=button name='Search'"
@@ -132,6 +133,7 @@ Design principles (these are the *why*):
 3. **Every step carries an assert.** Checkpoints are per-step, not just a final one — we never assume a click worked.
 4. **Errors are first-class.** Each step declares how to classify and handle its failure modes, feeding the replay engine's decision tree.
 5. **Human-manageable — review, edit, version.** The artifact is plain, diffable JSON, so a human can read *why* a locator was chosen (`reasoning`), fix it when the target site changes (rename a button, bump a route), bump the `version`, and re-verify with a dry-run replay — *without* re-running expensive discovery. Small drift = hand-edit the locator; big change = trigger a fresh discovery and review the new version. The artifact is treated like code: versioned, reviewable, repairable.
+6. **Customer data is encrypted at rest.** The values a user actually types — member IDs, names, amounts, account numbers — belong to the customer, not to us. When an artifact records a step's input value, that value is AES-256-GCM encrypted with a per-tenant key before it is written; replay decrypts only at the moment of use. The locator strategy (role/name/reasoning) stays plaintext — that is UI structure, not customer data — so the artifact remains reviewable and repairable while the sensitive payload stays opaque even to internal operators.
 
 ## 6. Deterministic replay + error taxonomy
 
@@ -188,7 +190,7 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 
 - **Explicit, configurable allowlist** of permitted domains/routes and permitted action types. The agent cannot act outside it — this is enforced in the agent loop *and* re-checked in replay.
 - **Risky/irreversible actions** (submit, delete, approve) are classified and gated — either blocked outright or routed to human escalation.
-- **Data handling:** regulated financial data is never persisted into artifacts or logs; extracted values are typed and only returned to the caller, never dumped into evidence.
+- **Data handling & encryption at rest:** customer-entered values that a replay must reproduce (member IDs, names, amounts) are AES-256-GCM encrypted with a per-tenant key before they are written into an artifact or a ReplayRun; replay decrypts only at the moment of use. Keys come from the environment / a KMS and are never committed to git or stored alongside the artifact. Extracted *outputs* (balances, account numbers) are typed, returned only to the caller, and never persisted. The locator strategy stays plaintext (it is UI structure, not customer data), so artifacts remain reviewable while the sensitive payload stays opaque even to internal operators.
 
 ## 10. Heterogeneity & multi-tenant (design only — not built)
 
@@ -221,6 +223,7 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 | 2026-09-17 | Legacy controls can have an empty accessible name (mock textbox has `name=""`) — artifact records role+name but replay needs a fallback chain (role ordinal / adjacent label) | surfaced as a concrete Phase 4 concern |
 | 2026-09-18 | Artifact is explicitly human-manageable — design principle #5 (review/edit/version) + a Phase 5 artifact-management CLI | "the site changed and I know exactly what changed" must be a cheap hand-edit + replay, never a re-discovery |
 | 2026-09-18 | Observability & repair loop (§7): every replay records a ReplayRun; success telemetry flags drift; a failure inbox replays the error; monitor→fix→re-verify closes the loop under human oversight | a deterministic executor becomes operable: drift is caught, diagnosed, repaired, and re-verified on evidence |
+| 2026-09-18 | Customer data is encrypted at rest (design principle #6 + §9): step input values are AES-256-GCM encrypted with a per-tenant key before writing; the locator strategy stays plaintext; replay decrypts only at use | customer PII stays opaque even to internal operators, while the artifact remains reviewable/repairable |
 
 ---
 
