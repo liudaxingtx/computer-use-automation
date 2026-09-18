@@ -14,5 +14,6 @@ test-results/
 
 # Evidence is deliberately committed (it's a deliverable) — do not ignore.
 
-# Chinese mirror docs stay local only (English goes to the repo for reviewers)
-*.zh.md
+# NOTE: Chinese mirror docs (*.zh.md) are temporarily committed for the
+# author's convenience (remote reading on the go). Re-add "*.zh.md" here and
+# remove them from the repo before final submission.
