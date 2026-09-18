@@ -10,13 +10,14 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-17 | Chinese mirror docs (`DESIGN.zh.md`, `README.zh.md`, `REPORT.zh.md`) |
 | 2026-09-17 | Repo initialized + git identity (Da Liu / liudaxingtx) |
 | 2026-09-17 | K3 API key verified — endpoint `api.moonshot.cn`, model `kimi-k3`, vision reads an image, reasoning model |
+| 2026-09-17 | Phase 1 — mock app (`mock-app/server.py`): "Legacy Member Services" with 3 runtime states planted |
 
 ## 🎯 Roadmap
 
 ### Phase 1 — Mock app (legacy bank back-office stand-in)
-- ⬜ build the hostile mock: table layouts, no test IDs, deeply nested markup
-- ⬜ plant three runtime states — "no such member" (business outcome), a confirm dialog (recoverable), a permission-denied state (hard failure)
-- ⬜ wire one non-trivial multi-step flow (search → detail → action)
+- ✅ build the hostile mock: table layouts, no test IDs, deeply nested markup
+- ✅ plant three runtime states — "no such member" (business outcome), a confirm dialog (recoverable), a permission-denied state (hard failure)
+- ✅ wire one non-trivial multi-step flow (search → detail → action)
 
 ### Phase 2 — Agent loop (discovery)
 - ⬜ Playwright + accessibility-tree observation (primary)

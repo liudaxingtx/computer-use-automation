@@ -9,13 +9,15 @@
 | 2026-09-17 | Phase 0 —— 设计与策略（`DESIGN.md`、`README.md`、`REPORT.md` 骨架） |
 | 2026-09-17 | 中文对照文档（`DESIGN.zh.md`、`README.zh.md`、`REPORT.zh.md`） |
 | 2026-09-17 | 仓库初始化 + git 身份（Da Liu / liudaxingtx） |
+| 2026-09-17 | K3 API key 验证通过（端点 cn + 视觉 + 推理模型） |
+| 2026-09-17 | Phase 1 —— mock 应用（`mock-app/server.py`）：Legacy Member Services，埋了 3 个运行时状态 |
 
 ## 🎯 路线图
 
 ### Phase 1 — Mock 应用（legacy 银行后台替身）
-- ⬜ 搭难啃的 mock：表格布局、无 test ID、深嵌套标记
-- ⬜ 埋三个运行时状态 —— "查无此人"（业务结果）、确认弹窗（可恢复）、权限拒绝（硬失败）
-- ⬜ 接通一个非平凡多步流程（搜索 → 详情 → 操作）
+- ✅ 搭难啃的 mock：表格布局、无 test ID、深嵌套标记
+- ✅ 埋三个运行时状态 —— "查无此人"（业务结果）、确认弹窗（可恢复）、权限拒绝（硬失败）
+- ✅ 接通一个非平凡多步流程（搜索 → 详情 → 操作）
 
 ### Phase 2 — Agent loop（discovery）
 - ⬜ Playwright + 无障碍树观察（主）
