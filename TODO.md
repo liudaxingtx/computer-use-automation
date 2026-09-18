@@ -9,6 +9,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-17 | Phase 0 — design & strategy (`DESIGN.md`, `README.md`, `REPORT.md` skeleton) |
 | 2026-09-17 | Chinese mirror docs (`DESIGN.zh.md`, `README.zh.md`, `REPORT.zh.md`) |
 | 2026-09-17 | Repo initialized + git identity (Da Liu / liudaxingtx) |
+| 2026-09-17 | K3 API key verified — endpoint `api.moonshot.cn`, model `kimi-k3`, vision reads an image, reasoning model |
 
 ## 🎯 Roadmap
 
@@ -46,7 +47,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## 🔜 Next up
 
-**Phase 1 — mock app** (unblocked once the K3 API key is confirmed).
+**Phase 1 — mock app** (in progress).
 
 ## 📦 Before final submission
 

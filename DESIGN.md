@@ -193,6 +193,7 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 | 2026-09-17 | Target = local hostile mock, not a public site | full control over error states to *prove* the taxonomy; no ToS/rate-limit risk |
 | 2026-09-17 | Single process, six modules; no infra | brief explicitly discourages premature scaling |
 | 2026-09-17 | Stack: Python + Playwright + DeepSeek (decisions) + K3 (vision) + Pydantic | maturity, our familiarity, and K3 solves the vision gap without external OCR |
+| 2026-09-17 | K3 verified: endpoint `api.moonshot.cn`, model `kimi-k3`, vision works (read "12345" from an image), reasoning model (`reasoning_content` + `content`) | vision fallback is now grounded, not assumed |
 
 ---
 
