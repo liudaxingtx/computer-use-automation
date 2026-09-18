@@ -12,6 +12,9 @@ test-results/
 .env
 .env.*
 
+# Runtime artifact store (the CLI's working directory)
+artifacts/
+
 # Evidence is deliberately committed (it's a deliverable) — do not ignore.
 
 # NOTE: Chinese mirror docs (*.zh.md) are temporarily committed for the

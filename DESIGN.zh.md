@@ -203,7 +203,7 @@ AUTOMATION ──卡住/危险/不可逆──▶ PAUSED ──操作员接管�
 - [x] **Phase 2 — agent loop（discovery）。** Playwright + 无障碍树（主）+ K3 视觉（兜底）+ DeepSeek 结构化决策；对 mock 跑通一次真实端到端。
 - [x] **Phase 3 — artifact。** Pydantic schema + 把 discovery 运行序列化成 Capability；可评审 + 版本化。
 - [x] **Phase 4 — replay。** 确定性 操作→断言→分支 引擎；三态结果契约；错误/恢复处理；每次运行都记录成一条 ReplayRun（结果 + 诊断 + 截图）。
-- [ ] **Phase 5 — 安全 + 升级 + artifact 管理。** allowlist 强制；暂停/让出/恢复交接状态机（mock 操作员 UI）；一个 CLI 用来 列表 / 改定位 / bump 版本 / dry-run 回放，让目标网站漂移时人工能维持 artifact 最新。
+- [x] **Phase 5 — 安全 + 升级 + artifact 管理。** allowlist 强制；暂停/让出/恢复交接状态机（mock 操作员 UI）；一个 CLI 用来 列表 / 改定位 / bump 版本 / dry-run 回放，让目标网站漂移时人工能维持 artifact 最新。
 - [ ] **Phase 6 — 证据 & 可观测性。** `/evidence/` 放一个 artifact、一份 discovery 日志、一份 replay 日志（含一次命中错误的回放）；成功率统计、失败案例库、以及 回放错误→修复→复查 的闭环。
 - [ ] **Phase 7 — REPORT.md。** 把本文档提炼成七个规定标题。
 
@@ -225,6 +225,7 @@ AUTOMATION ──卡住/危险/不可逆──▶ PAUSED ──操作员接管�
 | 2026-09-18 | 可观测性 + 修复闭环（§7）：每次回放记录 ReplayRun；成功率统计标记漂移；失败案例库回放错误；监控→修复→复查 在人工监察下闭环 | 确定性执行器变得可运营：漂移被抓住、诊断、修复、并靠证据复查 |
 | 2026-09-18 | 客户数据静态加密（设计原则 #6 + §9）：step 输入值写入前用 per-tenant 密钥 AES-256-GCM 加密；定位策略保持明文；回放仅在用时解密 | 客户 PII 即使对内部操作员也不透明，而 artifact 仍可评审/可修复 |
 | 2026-09-18 | Phase 4 完成：确定性回放（操作→断言→分支，无 LLM）+ 三态契约，对 mock 三个埋点验证 success / business_outcome / failure；空 name 的 ordinal fallback + 带边界重试 | 无 LLM 的生产路径是真的，错误分类是被证明的、不是嘴上说的 |
+| 2026-09-18 | Phase 5 完成：allowlist 在 loop + replay 强制；AES-256-GCM 静态加密（用时解密）；硬失败时 pause/cede/resume 交接；artifact CLI（list/edit/bump/verify） | 安全、升级、人可管理修复都是真实代码，不是设计笔记 |
 
 ---
 

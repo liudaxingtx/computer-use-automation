@@ -4,8 +4,11 @@ This is the "LLM appears exactly once" stage: the model drives a real, live
 browser session to *discover* how to accomplish a task. The transcript it
 produces is the raw material that Phase 3 distills into a Capability artifact.
 """
+from typing import Optional
+
 from . import llm
 from .observe import observe, screenshot_b64
+from .safety import SafetyPolicy, check_action
 
 SYSTEM_PROMPT = """You are a computer-use agent discovering how to accomplish a task on a legacy web application.
 
@@ -143,8 +146,12 @@ def _act(page, decision: dict, obs: dict) -> dict:
     return {"action": kind, "target": None, "value": None, "desc": f"{kind} (no-op)"}
 
 
-def run_discovery(page, task: str, max_steps: int = 20, verbose: bool = True) -> dict:
-    """Run the observe→decide→act loop until done/fail or step budget runs out."""
+def run_discovery(page, task: str, max_steps: int = 20, verbose: bool = True,
+                  policy: Optional[SafetyPolicy] = None) -> dict:
+    """Run the observe→decide→act loop until done/fail or step budget runs out.
+
+    Optional `policy` enforces the allowlist before any action is executed.
+    """
     history: list[str] = []
     steps: list[dict] = []
 
@@ -164,7 +171,22 @@ def run_discovery(page, task: str, max_steps: int = 20, verbose: bool = True) ->
         ]
         decision = llm.deepseek_decide(messages)
 
+        action = decision.get("action", {})
+        kind = str(action.get("kind", "")).lower()
         thought = decision.get("thought", "")
+
+        # Enforce the allowlist before acting (design §9).
+        if policy is not None and kind in ("click", "type", "select", "navigate", "wait"):
+            url = action.get("url") if kind == "navigate" else None
+            ok, reason = check_action(kind, url, policy)
+            if not ok:
+                return {
+                    "status": "blocked_by_policy",
+                    "goal_reached": False,
+                    "outputs": {},
+                    "reason": reason,
+                    "steps": steps,
+                }
 
         act = _act(page, decision, obs)
         desc = act["desc"]

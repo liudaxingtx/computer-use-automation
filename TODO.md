@@ -13,7 +13,8 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-17 | Phase 1 — mock app (`mock-app/server.py`): "Legacy Member Services" with 3 runtime states planted |
 | 2026-09-17 | Phase 2 — agent loop (`agent/`): a11y-tree observation + DeepSeek structured decisions + K3 vision fallback; real end-to-end run in 5 steps |
 | 2026-09-18 | Phase 3 — artifact (`agent/artifact.py`): Pydantic `Capability` schema + `serialize`; typed/versioned/reviewable JSON |
-| 2026-09-18 | Phase 4 — replay (`agent/replay.py`): deterministic act→assert→branch (no LLM); three-state contract verified (success / business_outcome / failure); ReplayRun record |
+| 2026-09-18 | Phase 4 — replay (`agent/replay.py`): deterministic act→assert→branch (no LLM); three-state contract verified; ReplayRun record |
+| 2026-09-18 | Phase 5 — safety + escalation + artifact mgmt (`agent/safety.py`, `handoff.py`, `crypto.py`, `cli.py`): allowlist, AES-256-GCM encryption, handoff, CLI list/edit/bump/verify |
 
 ## 🎯 Roadmap
 
@@ -39,10 +40,10 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ recoverable vs hard-failure handling (bounded retries, hard stops) + empty-name ordinal fallback
 
 ### Phase 5 — Safety + escalation + artifact management
-- ⬜ configurable allowlist (domains/routes + action types), enforced in loop and replay
-- ⬜ pause / cede / resume handoff state machine on the live session + mocked operator UI
-- ⬜ artifact-management CLI: list / edit locators / bump version / dry-run replay
-- ⬜ encryption at rest (design principle #6): AES-256-GCM step values + per-tenant key
+- ✅ configurable allowlist (domains/routes + action types), enforced in loop and replay
+- ✅ pause / cede / resume handoff state machine on the live session
+- ✅ artifact-management CLI: list / edit locators / bump version / verify (dry-run replay)
+- ✅ encryption at rest (AES-256-GCM step values + per-tenant key, decrypt-on-use)
 
 ### Phase 6 — Evidence & observability
 - ⬜ `/evidence/`: saved artifact + discovery log + replay log (one that hits an error)
@@ -53,12 +54,10 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## 🔜 Next up
 
-**Phase 5 — Safety + escalation + artifact management.**
+**Phase 6 — Evidence & observability.**
 
-1. allowlist (domains/routes + action types) enforced in loop and replay
-2. pause / cede / resume handoff state machine + mocked operator UI
-3. artifact-management CLI (list / edit locators / bump version / dry-run replay)
-4. encryption at rest (AES-256-GCM step values, per-tenant key)
+1. `/evidence/`: a saved artifact, a real discovery log, and replay logs — including one replay that hits an error state
+2. success telemetry + a failure inbox + the replay-the-error → repair → re-verify loop
 
 ## 📦 Before final submission
 

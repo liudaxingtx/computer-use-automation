@@ -12,7 +12,10 @@ from typing import Any, Literal, Optional, cast
 from playwright.sync_api import Page
 from pydantic import BaseModel
 
+from . import crypto
 from .artifact import Capability, LocatorStrategy, Step
+from .handoff import Handoff
+from .safety import SafetyPolicy, check_action
 
 Result = Literal["success", "business_outcome", "failure"]
 
@@ -31,11 +34,13 @@ class ReplayRun(BaseModel):
     duration_ms: int
 
 
-def _resolve_locator(page: Page, target: LocatorStrategy):
+def _resolve_locator(page: Page, target: Optional[LocatorStrategy]):
     """Turn a LocatorStrategy into a Playwright locator, with a fallback chain.
 
     accessibility: role + name, falling back to role + ordinal when name is empty.
     """
+    if target is None:
+        raise ValueError("step requires a locator target but none was recorded")
     if target.strategy == "accessibility":
         role = cast(Any, target.role)
         if target.name:
@@ -53,11 +58,15 @@ def _resolve_locator(page: Page, target: LocatorStrategy):
     raise ValueError(f"unsupported locator strategy: {target.strategy}")
 
 
-def _interpolate(value: Optional[str], inputs: dict) -> str:
-    """Substitute {param} placeholders in a step value with real inputs."""
+def _interpolate(value: Optional[str], inputs: dict, key=None) -> str:
+    """Substitute {param} placeholders; decrypt encrypted values at the moment of use."""
     if value is None:
         return ""
     s = str(value)
+    if crypto.is_encrypted(s):
+        if key is None:
+            raise ValueError("encrypted value but no decryption key supplied")
+        s = crypto.decrypt(s, key)
     for k, v in inputs.items():
         s = s.replace("{" + k + "}", str(v))
     return s
@@ -86,17 +95,24 @@ def _classify(page: Page, cap: Capability) -> Optional[tuple[Result, str]]:
     return None
 
 
-def _execute(page: Page, step: Step, inputs: dict):
-    """Perform a single step's action. Raises on locator/timeout failures."""
+def _execute(page: Page, step: Step, inputs: dict, key=None, policy: Optional[SafetyPolicy] = None):
+    """Perform a single step's action. Enforces the allowlist before acting.
+    Raises on locator/timeout failures or a policy violation."""
     action = step.action
+    if policy is not None:
+        url = _interpolate(step.value, inputs, key) if action == "navigate" else None
+        ok, reason = check_action(action, url, policy)
+        if not ok:
+            raise ValueError(f"safety policy blocked step: {reason}")
+
     if action == "click":
         _resolve_locator(page, step.target).click()
     elif action == "type":
-        _resolve_locator(page, step.target).fill(_interpolate(step.value, inputs))
+        _resolve_locator(page, step.target).fill(_interpolate(step.value, inputs, key))
     elif action == "select":
-        _resolve_locator(page, step.target).select_option(_interpolate(step.value, inputs))
+        _resolve_locator(page, step.target).select_option(_interpolate(step.value, inputs, key))
     elif action == "navigate":
-        page.goto(_interpolate(step.value, inputs))
+        page.goto(_interpolate(step.value, inputs, key))
     elif action == "wait":
         page.wait_for_timeout(2000)
     # "read" is declared in the schema but not yet produced by discovery.
@@ -113,13 +129,23 @@ def _max_attempts(step: Step) -> int:
 
 
 def replay(page: Page, cap: Capability, inputs: dict,
-           screenshot_dir: Optional[str] = None) -> ReplayRun:
-    """Deterministically re-run a Capability. Returns a ReplayRun record."""
+           screenshot_dir: Optional[str] = None,
+           tenant_id: str = "default",
+           policy: Optional[SafetyPolicy] = None,
+           handoff: Optional[Handoff] = None) -> ReplayRun:
+    """Deterministically re-run a Capability. Returns a ReplayRun record.
+
+    Optional `policy` enforces the allowlist; optional `handoff` pauses to a
+    human operator on hard failure (design §8).
+    """
     started = datetime.now(timezone.utc)
     steps_log: list[dict] = []
+    key = crypto.get_key(tenant_id)
 
     def _finish(result: Result, diagnostic: str = "", outputs: dict | None = None,
                 screenshot: Optional[str] = None) -> ReplayRun:
+        if result == "failure" and handoff is not None and handoff.is_automation():
+            handoff.pause(diagnostic or "hard failure")
         duration = int((datetime.now(timezone.utc) - started).total_seconds() * 1000)
         return ReplayRun(
             capability=cap.meta.name,
@@ -140,7 +166,7 @@ def replay(page: Page, cap: Capability, inputs: dict,
         last_err: Optional[Exception] = None
         for attempt in range(1, attempts + 1):
             try:
-                _execute(page, step, inputs)
+                _execute(page, step, inputs, key, policy)
                 page.wait_for_load_state("domcontentloaded")
                 last_err = None
                 break

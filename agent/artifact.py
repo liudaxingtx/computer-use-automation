@@ -102,6 +102,8 @@ def serialize(
     business_outcomes: Optional[list[dict]] = None,
     failure_patterns: Optional[list[dict]] = None,
     value_params: Optional[dict] = None,
+    encrypt_values: bool = False,
+    tenant_id: str = "default",
 ) -> Capability:
     """Distill a discovery run into a Capability.
 
@@ -130,10 +132,14 @@ def serialize(
 
         # Parameterize the concrete input value into a {param} placeholder so the
         # artifact records *intent*, not the specific customer value (design
-        # principle #1 + #6: no plaintext customer data in the artifact).
+        # principle #1). Any concrete value that cannot be parameterized is
+        # encrypted at rest (design principle #6) instead of stored in plaintext.
+        from . import crypto
         value = s.get("value")
         if value_params and value in value_params:
             value = "{" + value_params[value] + "}"
+        elif value and encrypt_values:
+            value = crypto.encrypt(str(value), crypto.get_key(tenant_id))
 
         steps.append(Step(
             action=action,
