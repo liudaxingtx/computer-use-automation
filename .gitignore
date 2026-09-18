@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Playwright / browser artifacts
+.playwright/
+test-results/
+
+# Env / secrets (never commit API keys)
+.env
+.env.*
+
+# Evidence is deliberately committed (it's a deliverable) — do not ignore.
