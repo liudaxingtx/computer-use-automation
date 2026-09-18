@@ -202,7 +202,7 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 - [x] **Phase 1 — mock app.** Build the hostile local legacy app with planted error/outcome states.
 - [x] **Phase 2 — agent loop (discovery).** Playwright + accessibility tree (primary) + K3 vision (fallback) + DeepSeek structured decisions; one real end-to-end run against the mock.
 - [x] **Phase 3 — artifact.** Pydantic schema + serialize the discovery run into a Capability; reviewability + versioning.
-- [ ] **Phase 4 — replay.** Deterministic act→assert→branch engine; the three-state result contract; error/recovery handling; every run recorded as a ReplayRun (result + diagnostic + screenshot).
+- [x] **Phase 4 — replay.** Deterministic act→assert→branch engine; the three-state result contract; error/recovery handling; every run recorded as a ReplayRun (result + diagnostic + screenshot).
 - [ ] **Phase 5 — safety + escalation + artifact management.** Allowlist enforcement; pause/cede/resume handoff state machine (mocked operator UI); a CLI to list / edit locators / bump version / dry-run replay so a human can keep artifacts current as target sites drift.
 - [ ] **Phase 6 — evidence & observability.** `/evidence/` with a saved artifact, a discovery log, and a replay log (including one that hits an error); success telemetry, a failure inbox, and the replay-the-error → repair → re-verify loop.
 - [ ] **Phase 7 — REPORT.md.** Distill this document into the seven mandated headings.
@@ -224,6 +224,7 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 | 2026-09-18 | Artifact is explicitly human-manageable — design principle #5 (review/edit/version) + a Phase 5 artifact-management CLI | "the site changed and I know exactly what changed" must be a cheap hand-edit + replay, never a re-discovery |
 | 2026-09-18 | Observability & repair loop (§7): every replay records a ReplayRun; success telemetry flags drift; a failure inbox replays the error; monitor→fix→re-verify closes the loop under human oversight | a deterministic executor becomes operable: drift is caught, diagnosed, repaired, and re-verified on evidence |
 | 2026-09-18 | Customer data is encrypted at rest (design principle #6 + §9): step input values are AES-256-GCM encrypted with a per-tenant key before writing; the locator strategy stays plaintext; replay decrypts only at use | customer PII stays opaque even to internal operators, while the artifact remains reviewable/repairable |
+| 2026-09-18 | Phase 4 done: deterministic replay (act→assert→branch, no LLM) + the three-state contract, verified success / business_outcome / failure against the mock's three planted conditions; empty-name ordinal fallback + bounded retries | the LLM-free production path is real and the error taxonomy is proven, not asserted |
 
 ---
 

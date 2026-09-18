@@ -89,9 +89,15 @@ def _act(page, decision: dict, obs: dict) -> dict:
         raise ValueError(f"decision kind={kind!r} is missing a required 'index'")
 
     def _target(el) -> dict:
-        # The locator strategy is role+name (accessibility). This is what the
-        # artifact freezes so replay can re-resolve the control without the LLM.
-        return {"strategy": "accessibility", "role": el["role"], "name": el["name"]}
+        # The locator strategy is role+name (accessibility), with an ordinal for
+        # the empty-name fallback. This is what the artifact freezes so replay can
+        # re-resolve the control without the LLM.
+        return {
+            "strategy": "accessibility",
+            "role": el["role"],
+            "name": el["name"],
+            "ordinal": el.get("ordinal"),
+        }
 
     if kind == "click":
         el = obs["elements"][idx - 1]

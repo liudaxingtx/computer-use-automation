@@ -11,8 +11,9 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-17 | Repo initialized + git identity (Da Liu / liudaxingtx) |
 | 2026-09-17 | K3 API key verified — endpoint `api.moonshot.cn`, model `kimi-k3`, vision reads an image, reasoning model |
 | 2026-09-17 | Phase 1 — mock app (`mock-app/server.py`): "Legacy Member Services" with 3 runtime states planted |
-| 2026-09-17 | Phase 2 — agent loop (`agent/`): a11y-tree observation + DeepSeek structured decisions + K3 vision fallback; real end-to-end run (search 1001 → deactivate) in 5 steps |
+| 2026-09-17 | Phase 2 — agent loop (`agent/`): a11y-tree observation + DeepSeek structured decisions + K3 vision fallback; real end-to-end run in 5 steps |
 | 2026-09-18 | Phase 3 — artifact (`agent/artifact.py`): Pydantic `Capability` schema + `serialize`; typed/versioned/reviewable JSON |
+| 2026-09-18 | Phase 4 — replay (`agent/replay.py`): deterministic act→assert→branch (no LLM); three-state contract verified (success / business_outcome / failure); ReplayRun record |
 
 ## 🎯 Roadmap
 
@@ -23,7 +24,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ### Phase 2 — Agent loop (discovery)
 - ✅ Playwright + accessibility-tree observation (primary)
-- ✅ Kimi K3 vision fallback for non-semantic surfaces (image-only gate: understands + returns coordinates)
+- ✅ Kimi K3 vision fallback for non-semantic surfaces
 - ✅ DeepSeek structured decisions (observe → decide → act)
 - ✅ one real end-to-end discovery run against the mock
 
@@ -33,28 +34,31 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ versioning + reviewability
 
 ### Phase 4 — Deterministic replay
-- ⬜ replay engine: act → assert → branch
-- ⬜ three-state result contract (success / business_outcome / failure)
-- ⬜ recoverable vs hard-failure handling (bounded retries, hard stops)
+- ✅ replay engine: act → assert → branch
+- ✅ three-state result contract (success / business_outcome / failure)
+- ✅ recoverable vs hard-failure handling (bounded retries, hard stops) + empty-name ordinal fallback
 
-### Phase 5 — Safety & escalation
+### Phase 5 — Safety + escalation + artifact management
 - ⬜ configurable allowlist (domains/routes + action types), enforced in loop and replay
 - ⬜ pause / cede / resume handoff state machine on the live session + mocked operator UI
+- ⬜ artifact-management CLI: list / edit locators / bump version / dry-run replay
+- ⬜ encryption at rest (design principle #6): AES-256-GCM step values + per-tenant key
 
-### Phase 6 — Evidence
-- ⬜ `/evidence/`: saved artifact + discovery log + replay log
-- ⬜ one replay that hits an error / exceptional state
+### Phase 6 — Evidence & observability
+- ⬜ `/evidence/`: saved artifact + discovery log + replay log (one that hits an error)
+- ⬜ success telemetry, a failure inbox, and the replay-the-error → repair → re-verify loop
 
 ### Phase 7 — REPORT.md
 - ⬜ distill `DESIGN.md` into the seven mandated headings
 
 ## 🔜 Next up
 
-**Phase 4 — Deterministic replay** (load-bearing wall #2).
+**Phase 5 — Safety + escalation + artifact management.**
 
-1. replay engine: act → assert → branch (consume the Capability, **no LLM in the loop**)
-2. three-state result contract (success / business_outcome / failure)
-3. recoverable vs hard-failure handling + fallback chain for empty-name controls
+1. allowlist (domains/routes + action types) enforced in loop and replay
+2. pause / cede / resume handoff state machine + mocked operator UI
+3. artifact-management CLI (list / edit locators / bump version / dry-run replay)
+4. encryption at rest (AES-256-GCM step values, per-tenant key)
 
 ## 📦 Before final submission
 

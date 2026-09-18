@@ -51,7 +51,15 @@ def collect_interactive(page: Page) -> list[dict]:
                     continue
             except Exception:
                 continue
-            items.append({"role": role, "name": _element_name(el), "locator": el})
+            # `ordinal` = this element's 1-based position *within its role*, so
+            # replay can fall back to `get_by_role(role).nth(ordinal-1)` when the
+            # accessible name is empty (see DESIGN decision log — empty-name fallback).
+            items.append({
+                "role": role,
+                "name": _element_name(el),
+                "ordinal": i + 1,
+                "locator": el,
+            })
     for idx, it in enumerate(items, start=1):
         it["index"] = idx
     return items

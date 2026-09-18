@@ -11,8 +11,9 @@
 | 2026-09-17 | 仓库初始化 + git 身份（Da Liu / liudaxingtx） |
 | 2026-09-17 | K3 API key 验证通过（端点 cn + 视觉 + 推理模型） |
 | 2026-09-17 | Phase 1 —— mock 应用（`mock-app/server.py`）：Legacy Member Services，埋了 3 个运行时状态 |
-| 2026-09-17 | Phase 2 —— agent loop（`agent/`）：无障碍树观察 + DeepSeek 结构化决策 + K3 视觉兜底；真实端到端（搜 1001 → deactivate）5 步跑通 |
+| 2026-09-17 | Phase 2 —— agent loop（`agent/`）：无障碍树观察 + DeepSeek 结构化决策 + K3 视觉兜底；真实端到端 5 步跑通 |
 | 2026-09-18 | Phase 3 —— artifact（`agent/artifact.py`）：Pydantic `Capability` schema + `serialize`；类型化/版本化/可评审 JSON |
+| 2026-09-18 | Phase 4 —— replay（`agent/replay.py`）：确定性 操作→断言→分支（无 LLM）；三态契约验证通过（success / business_outcome / failure）；ReplayRun 记录 |
 
 ## 🎯 路线图
 
@@ -23,7 +24,7 @@
 
 ### Phase 2 — Agent loop（discovery）
 - ✅ Playwright + 无障碍树观察（主）
-- ✅ Kimi K3 视觉兜底（纯图片门禁页：能理解 + 返回坐标）
+- ✅ Kimi K3 视觉兜底（无语义界面）
 - ✅ DeepSeek 结构化决策（observe → decide → act）
 - ✅ 对 mock 跑通一次真实端到端 discovery run
 
@@ -33,28 +34,31 @@
 - ✅ 版本化 + 可评审
 
 ### Phase 4 — 确定性回放
-- ⬜ 回放引擎：操作 → 断言 → 分支
-- ⬜ 三态结果契约（success / business_outcome / failure）
-- ⬜ 可恢复 vs 硬失败处理（带边界重试、硬停）
+- ✅ 回放引擎：操作 → 断言 → 分支
+- ✅ 三态结果契约（success / business_outcome / failure）
+- ✅ 可恢复 vs 硬失败处理（带边界重试、硬停）+ 空 name 的 ordinal fallback
 
-### Phase 5 — 安全与升级
+### Phase 5 — 安全 + 升级 + artifact 管理
 - ⬜ 可配置 allowlist（域名/路由 + 动作类型），loop 和回放里都强制
 - ⬜ live session 上 暂停/让出/恢复 交接状态机 + mock 操作员 UI
+- ⬜ artifact 管理 CLI：列表 / 改定位 / bump 版本 / dry-run 回放
+- ⬜ 静态加密（设计原则 #6）：AES-256-GCM step 值 + per-tenant 密钥
 
-### Phase 6 — 证据
-- ⬜ `/evidence/`：保存的 artifact + discovery 日志 + replay 日志
-- ⬜ 一次命中错误/异常状态的回放
+### Phase 6 — 证据 & 可观测性
+- ⬜ `/evidence/`：保存的 artifact + discovery 日志 + replay 日志（含一次命中错误）
+- ⬜ 成功率统计、失败案例库、以及 回放错误→修复→复查 的闭环
 
 ### Phase 7 — REPORT.md
 - ⬜ 把 `DESIGN.md` 提炼成七个规定标题
 
 ## 🔜 下一步
 
-**Phase 4 —— 确定性回放**（承重墙第二道）。
+**Phase 5 —— 安全 + 升级 + artifact 管理。**
 
-1. 回放引擎：操作 → 断言 → 分支（消费 Capability，**循环里无 LLM**）
-2. 三态结果契约（success / business_outcome / failure）
-3. 可恢复 vs 硬失败处理 + 空 name 控件的 fallback 链
+1. allowlist（域名/路由 + 动作类型）在 loop 和回放里强制
+2. 暂停/让出/恢复 交接状态机 + mock 操作员 UI
+3. artifact 管理 CLI（列表 / 改定位 / bump 版本 / dry-run 回放）
+4. 静态加密（AES-256-GCM step 值、per-tenant 密钥）
 
 ## 📦 交作业前
 
