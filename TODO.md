@@ -11,6 +11,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-17 | Repo initialized + git identity (Da Liu / liudaxingtx) |
 | 2026-09-17 | K3 API key verified — endpoint `api.moonshot.cn`, model `kimi-k3`, vision reads an image, reasoning model |
 | 2026-09-17 | Phase 1 — mock app (`mock-app/server.py`): "Legacy Member Services" with 3 runtime states planted |
+| 2026-09-17 | Phase 2 — agent loop (`agent/`): a11y-tree observation + DeepSeek structured decisions + K3 vision fallback; real end-to-end run (search 1001 → deactivate) in 5 steps |
 
 ## 🎯 Roadmap
 
@@ -20,10 +21,10 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ wire one non-trivial multi-step flow (search → detail → action)
 
 ### Phase 2 — Agent loop (discovery)
-- ⬜ Playwright + accessibility-tree observation (primary)
-- ⬜ Kimi K3 vision fallback for non-semantic surfaces
-- ⬜ DeepSeek structured decisions (observe → decide → act)
-- ⬜ one real end-to-end discovery run against the mock
+- ✅ Playwright + accessibility-tree observation (primary)
+- ✅ Kimi K3 vision fallback for non-semantic surfaces (image-only gate: understands + returns coordinates)
+- ✅ DeepSeek structured decisions (observe → decide → act)
+- ✅ one real end-to-end discovery run against the mock
 
 ### Phase 3 — Artifact
 - ⬜ Pydantic artifact schema (Capability)
@@ -48,12 +49,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 
 ## 🔜 Next up
 
-**Phase 2 — Agent loop (discovery)** — the heart of the project.
+**Phase 3 — Artifact** (the load-bearing schema).
 
-Resume from here next session:
-1. `pip install playwright` + chromium kernel
-2. observe → decide → act loop: accessibility tree (primary) + DeepSeek structured decisions + K3 vision fallback
-3. one real end-to-end discovery run: search member 1001 → detail → deactivate
+1. Pydantic `Capability` schema — meta, inputs, outputs, checkpoint, typed steps
+2. serialize a discovery run → Capability (distill steps + locator strategies from the transcript)
+3. versioning + reviewability (human-readable, diffable)
 
 ## 📦 Before final submission
 

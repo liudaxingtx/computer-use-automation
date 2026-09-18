@@ -11,6 +11,7 @@
 | 2026-09-17 | 仓库初始化 + git 身份（Da Liu / liudaxingtx） |
 | 2026-09-17 | K3 API key 验证通过（端点 cn + 视觉 + 推理模型） |
 | 2026-09-17 | Phase 1 —— mock 应用（`mock-app/server.py`）：Legacy Member Services，埋了 3 个运行时状态 |
+| 2026-09-17 | Phase 2 —— agent loop（`agent/`）：无障碍树观察 + DeepSeek 结构化决策 + K3 视觉兜底；真实端到端（搜 1001 → deactivate）5 步跑通 |
 
 ## 🎯 路线图
 
@@ -20,10 +21,10 @@
 - ✅ 接通一个非平凡多步流程（搜索 → 详情 → 操作）
 
 ### Phase 2 — Agent loop（discovery）
-- ⬜ Playwright + 无障碍树观察（主）
-- ⬜ Kimi K3 视觉兜底（无语义界面）
-- ⬜ DeepSeek 结构化决策（observe → decide → act）
-- ⬜ 对 mock 跑通一次真实端到端 discovery run
+- ✅ Playwright + 无障碍树观察（主）
+- ✅ Kimi K3 视觉兜底（纯图片门禁页：能理解 + 返回坐标）
+- ✅ DeepSeek 结构化决策（observe → decide → act）
+- ✅ 对 mock 跑通一次真实端到端 discovery run
 
 ### Phase 3 — Artifact
 - ⬜ Pydantic artifact schema（Capability）
@@ -48,12 +49,11 @@
 
 ## 🔜 下一步
 
-**Phase 2 —— Agent loop（discovery）**，整个项目的心脏。
+**Phase 3 —— Artifact**（承重 schema）。
 
-明天从这里接着做：
-1. `pip install playwright` + chromium 内核
-2. observe → decide → act 循环：无障碍树（主）+ DeepSeek 结构化决策 + K3 视觉兜底
-3. 跑一次真实端到端 discovery：搜 member 1001 → 看详情 → deactivate
+1. Pydantic `Capability` schema —— meta、inputs、outputs、checkpoint、typed steps
+2. 把 discovery run 序列化成 Capability（从 transcript 提炼步骤 + 定位策略）
+3. 版本化 + 可评审（人类可读、可 diff）
 
 ## 📦 交作业前
 

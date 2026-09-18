@@ -26,6 +26,7 @@ Run:  python3 server.py   (serves http://localhost:9000)
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
+import base64
 
 PORT = 9000
 
@@ -124,6 +125,36 @@ def result_denied(mid):
     return page("RESULT", body)
 
 
+def img_button_page():
+    """A deliberately NON-SEMANTIC surface: the only control is an <img> 'button'
+    with no alt text. The accessibility tree exposes no button/link here, so a
+    competent agent must fall back to vision to understand and act on it."""
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="64">'
+        '<rect width="220" height="64" rx="10" fill="#0000cc"/>'
+        '<text x="110" y="42" font-size="26" fill="#ffffff" text-anchor="middle" '
+        'font-family="Arial, sans-serif" font-weight="bold">CONTINUE</text>'
+        "</svg>"
+    )
+    data = base64.b64encode(svg.encode("utf-8")).decode()
+    body = (
+        '<font size="4"><b>IMAGE GATE</b></font><br><br>\n'
+        '<font size="2">CLICK THE BUTTON BELOW TO PROCEED.</font><br><br>\n'
+        '<img src="data:image/svg+xml;base64,' + data + '" '
+        'onclick="location.href=\'/imgbutton_done\'" style="cursor:pointer">'
+    )
+    return page("IMAGE GATE", body)
+
+
+def img_button_done_page():
+    body = (
+        '<font size="4" color="#008000"><b>PROCEEDED</b></font><br><br>\n'
+        '<font size="2">YOU CLICKED THE IMAGE BUTTON.</font><br><br>\n'
+        '<a href="/"><font size="2">BACK TO SEARCH</font></a>'
+    )
+    return page("IMAGE GATE", body)
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -146,6 +177,10 @@ class Handler(BaseHTTPRequestHandler):
                 html, code = result_denied(mid), 200  # hard failure surfaced as a page state
             else:
                 html, code = result_success(mid), 200
+        elif parsed.path == "/imgbutton":
+            html, code = img_button_page(), 200
+        elif parsed.path == "/imgbutton_done":
+            html, code = img_button_done_page(), 200
         else:
             html, code = page("NOT FOUND", "<font size='4'>404</font>"), 404
 
