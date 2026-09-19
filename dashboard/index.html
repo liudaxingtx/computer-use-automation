@@ -191,6 +191,13 @@ const $ = s => document.querySelector(s);
 const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); };
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+// 全角 → 半角规范化（中文输入法常见问题：全角数字 "１００１" 不等于半角 "1001"）
+function normalizeInput(s) {
+  return String(s)
+    .replace(/\u3000/g, ' ')                                   // 全角空格 → 半角空格
+    .replace(/[\uff01-\uff5e]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xfee0)); // 全角 ASCII → 半角
+}
+
 const RESULT = { success: 'Success', business_outcome: 'Business outcome', failure: 'Failure' };
 
 function fmtRunStats(r) {
@@ -346,7 +353,8 @@ function highlight(v) {
 async function runTest(name) {
   const inputs = {};
   document.querySelectorAll('[data-input]').forEach(el => {
-    if (el.value.trim() !== '') inputs[el.dataset.input] = el.value.trim();
+    const v = normalizeInput(el.value).trim();
+    if (v !== '') inputs[el.dataset.input] = v;
   });
   const btn = document.querySelector('button.run');
   btn.disabled = true; btn.textContent = 'Executing…';
