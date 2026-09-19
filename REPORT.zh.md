@@ -66,3 +66,21 @@ AUTOMATION ──卡住/危险/不可逆──▶ PAUSED ──操作员接管�
 ## 7. 砍掉了什么
 
 要深度不要广度，刻意砍：**不建队列/集群/多租户管道**（题目不建议过早基础设施）；**不对公开网站自动化**（ToS 和状态不可控——我们用本地难啃 mock 证明错误分类）；**不落地坐标/视觉点击**（见 §3——是「已知边界 + 已知解法」，不是已交付能力）。每一刀都用功能广度换三块承重墙（artifact schema、确定性回放 + 错误分类、人工交接）以及可观测/修复闭环上的真实深度。
+
+---
+
+## 附录 — 怎么运行 & 验收
+
+从快到深，三条验收路径：
+
+**1. 一键测试。** `./scripts/run_tests.sh` 拉起 mock，然后跑真实端到端测试：discovery（DeepSeek 决策）→ artifact 序列化 → 确定性回放（三种结果状态全覆盖）→ 安全/加密/交接 → K3 视觉兜底 → 可观测性。它会真实调用 LLM、花一点点 token——这正是重点：是真实 run，不是 mock。
+
+**2. 查看证据。** `evidence/` 放了一次真实运行的产物：提炼后的 Capability（`artifact_deactivate_member.json`）、原始 discovery 记录、三份 replay（`success`、`business_outcome`「查无此人」、`failure`「权限拒绝」）、以及失败截图。读这些，能看到三态契约和静态加密在真实数据上工作。
+
+**3. 自己上手走一遍。** 让 mock 跑着（`python3 mock-app/server.py`）：
+
+- 发现：`.venv/bin/python -m agent.main --task "Search for member 1001, view their detail, then deactivate the account."`
+- 管理 artifact：`.venv/bin/python -m agent.cli list | telemetry | failures | replay-case <id> | resolve <id>`
+- 复现修复闭环：`verify` → `edit --step 2 --new-name WRONG`（失败）→ `edit --step 2 --new-name SEARCH` → `bump` → `verify`（通过）
+
+README 里有完整操作手册。

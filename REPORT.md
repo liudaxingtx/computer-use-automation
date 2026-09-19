@@ -66,3 +66,21 @@ Three layers. **Allowlist:** permitted domains/routes and action types, enforced
 ## 7. Cuts
 
 Depth over breadth, deliberately: **no queues, clusters, or multi-tenant plumbing** (the brief discourages premature infrastructure); **no automation against public sites** (ToS and uncontrollable state — we prove the error taxonomy on a local hostile mock instead); **no coordinate/visual clicking** (see §3 — a documented boundary with a known fix, not a shipped capability). Each cut trades feature breadth for real depth on the three load-bearing pieces — artifact schema, deterministic replay with an error taxonomy, and human handoff — plus a working observability/repair loop.
+
+---
+
+## Appendix — How to run & verify
+
+Three ways to verify the work, fastest to deepest:
+
+**1. One-command test suite.** `./scripts/run_tests.sh` boots the mock, then runs the real end-to-end tests: discovery (DeepSeek decisions) → artifact serialization → deterministic replay across all three result states → safety/encryption/handoff → K3 vision fallback → observability. It makes real LLM calls, so it costs a few tokens — that is the point: a real run, not a mock.
+
+**2. Inspect the evidence.** `evidence/` holds the artifacts of a real run: the distilled Capability (`artifact_deactivate_member.json`), the raw discovery transcript, three replay runs (`success`, `business_outcome` "no such member", `failure` "access denied"), and the failure screenshot. Read these to see the three-state contract and encryption-at-rest working on real data.
+
+**3. Drive the loop yourself.** With the mock running (`python3 mock-app/server.py`):
+
+- Discover: `.venv/bin/python -m agent.main --task "Search for member 1001, view their detail, then deactivate the account."`
+- Manage artifacts: `.venv/bin/python -m agent.cli list | telemetry | failures | replay-case <id> | resolve <id>`
+- Reproduce the repair loop: `verify` → `edit --step 2 --new-name WRONG` (fails) → `edit --step 2 --new-name SEARCH` → `bump` → `verify` (passes)
+
+The README carries the full runbook.
