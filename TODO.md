@@ -16,6 +16,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-18 | Phase 4 — replay (`agent/replay.py`): deterministic act→assert→branch (no LLM); three-state contract verified; ReplayRun record |
 | 2026-09-18 | Phase 5 — safety + escalation + artifact mgmt (`agent/safety.py`, `handoff.py`, `crypto.py`, `cli.py`): allowlist, AES-256-GCM encryption, handoff, CLI list/edit/bump/verify |
 | 2026-09-19 | Phase 6 — evidence & observability (`agent/observability.py`): ReplayStore (append-only runs, inputs encrypted at rest) + success telemetry + failure inbox + replay-the-error; `/evidence/` with artifact + discovery log + 3 replay runs (incl. one failure); CLI `telemetry`/`failures`/`replay-case`/`resolve`; repair loop demonstrated end-to-end |
+| 2026-09-19 | Phase 7 — REPORT.md: distilled DESIGN.md into the seven mandated headings (architecture / artifact schema / determinism+locator / heterogeneity / handoff / safety / cuts) |
 
 ## 🎯 Roadmap
 
@@ -51,13 +52,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ success telemetry, a failure inbox, and the replay-the-error → repair → re-verify loop
 
 ### Phase 7 — REPORT.md
-- ⬜ distill `DESIGN.md` into the seven mandated headings
+- ✅ distill `DESIGN.md` into the seven mandated headings
 
 ## 🔜 Next up
 
-**Phase 7 — REPORT.md.**
-
-Distill `DESIGN.md` into the seven mandated headings.
+**Before final submission** (see below).
 
 ## 📦 Before final submission
 

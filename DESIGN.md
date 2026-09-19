@@ -205,7 +205,7 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 - [x] **Phase 4 — replay.** Deterministic act→assert→branch engine; the three-state result contract; error/recovery handling; every run recorded as a ReplayRun (result + diagnostic + screenshot).
 - [x] **Phase 5 — safety + escalation + artifact management.** Allowlist enforcement; pause/cede/resume handoff state machine (mocked operator UI); a CLI to list / edit locators / bump version / dry-run replay so a human can keep artifacts current as target sites drift.
 - [x] **Phase 6 — evidence & observability.** `/evidence/` with a saved artifact, a discovery log, and a replay log (including one that hits an error); success telemetry, a failure inbox, and the replay-the-error → repair → re-verify loop.
-- [ ] **Phase 7 — REPORT.md.** Distill this document into the seven mandated headings.
+- [x] **Phase 7 — REPORT.md.** Distill this document into the seven mandated headings.
 
 ## 12. Decision log / status
 
@@ -227,6 +227,8 @@ The operator console is deliberately mocked, but the pause/cede/resume mechanism
 | 2026-09-18 | Phase 4 done: deterministic replay (act→assert→branch, no LLM) + the three-state contract, verified success / business_outcome / failure against the mock's three planted conditions; empty-name ordinal fallback + bounded retries | the LLM-free production path is real and the error taxonomy is proven, not asserted |
 | 2026-09-18 | Phase 5 done: allowlist enforced in loop + replay; AES-256-GCM encryption at rest (decrypt-on-use); pause/cede/resume handoff on hard failure; artifact CLI (list/edit/bump/verify) | safety, escalation, and human-manageable repair are all real code, not design notes |
 | 2026-09-19 | Phase 6 done: ReplayStore (append-only ReplayRun records, inputs AES-256-GCM encrypted at rest) + success telemetry + failure inbox + replay-the-error; `/evidence/` carries the artifact, discovery log, and three replay runs (success / business-outcome / failure); CLI `telemetry`/`failures`/`replay-case`/`resolve`; the repair loop (drift → failure → edit+bump → re-verify) demonstrated live | every replay is recorded, measured, and reproducible — the §7 observability + repair loop is now real code backed by real evidence, not design notes |
+| 2026-09-19 | Real-site trial surfaced a coordinate-click gap: the act vocabulary has no coordinate action, so fully visual surfaces (canvas / image captcha) are *understood* by K3 (which returns coordinates) but not *executable*. Decision: document as a known boundary + known fix (a `visual` locator of template-match or normalized coordinates) in REPORT §3, do NOT implement | coordinate clicking conflicts with "intent, not coordinates" and only matters for the rarest surfaces — a documented boundary with a clear path beats shipping a fragile capability |
+| 2026-09-19 | Phase 7 done: REPORT.md distills DESIGN.md into the seven mandated headings | the assignment's seven headings are answered with the implementation and `/evidence/` behind them |
 
 ---
 
