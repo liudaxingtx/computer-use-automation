@@ -62,6 +62,8 @@ class OutputSpec(BaseModel):
     name: str
     type: str = "str"
     source: str = ""       # which step/page the value is read from
+    label: str = ""        # on-page field name for key-value extraction (defaults to name.upper())
+    extract: str = ""      # optional CSS selector to read the value directly
 
 
 class OutcomePattern(BaseModel):
@@ -171,3 +173,70 @@ def serialize(
 def to_json(cap: Capability) -> str:
     """Human-readable, diffable JSON rendering of a Capability."""
     return cap.model_dump_json(indent=2)
+
+
+def auto_serialize(discovery: dict, name: str, description: str = "",
+                   url: str = "") -> Capability:
+    """Distill a discovery run into a Capability with NO hand-specified metadata.
+
+    Everything is inferred from the discovery transcript:
+      - checkpoint_text: the LLM's `done` decision declares the exact success
+        text that appears on the page (see loop.SYSTEM_PROMPT).
+      - outputs: the fields the LLM extracted at `done`, each keyed by name and
+        matched back to the on-page label (normalized).
+      - inputs: every `type` step is parameterized — its concrete value becomes
+        a `{param}` placeholder. The param name is the extracted output whose
+        value equals the typed value, else `param_N`.
+
+    business_outcomes / failure_patterns are left empty: a discovery run only
+    sees the happy path, so error-state signals are filled in later.
+    """
+    from urllib.parse import urlparse
+
+    outputs = discovery.get("outputs", {}) or {}
+    steps = discovery.get("steps", [])
+
+    # --- outputs: field name -> on-page label ---
+    output_specs = [
+        {"name": str(k), "type": "str", "source": "result page", "label": str(k)}
+        for k in outputs.keys()
+    ]
+
+    # --- inputs: parameterize each `type` value ---
+    value_to_param = {str(v): str(k) for k, v in outputs.items()}
+    input_specs: list[dict] = []
+    value_params: dict[str, str] = {}
+    seen: dict[str, str] = {}
+    param_i = 0
+    for s in steps:
+        if s.get("action") != "type" or s.get("value") is None:
+            continue
+        val = str(s["value"])
+        if val in value_to_param:
+            pname = value_to_param[val]
+        elif val in seen:
+            pname = seen[val]
+        else:
+            param_i += 1
+            pname = f"param_{param_i}"
+            seen[val] = pname
+        value_params[val] = pname
+        if pname not in [i["name"] for i in input_specs]:
+            input_specs.append({"name": pname, "type": "str", "required": True})
+
+    checkpoint_text = discovery.get("checkpoint_text", "") or ""
+    domain = urlparse(url).netloc or ""
+
+    return serialize(
+        discovery,
+        name=name,
+        description=description,
+        inputs=input_specs,
+        outputs=output_specs,
+        checkpoint="goal reached",
+        checkpoint_text=checkpoint_text,
+        business_outcomes=[],
+        failure_patterns=[],
+        value_params=value_params,
+        domain=domain,
+    )

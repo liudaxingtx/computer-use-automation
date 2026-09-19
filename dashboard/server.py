@@ -13,7 +13,9 @@ Endpoints:
 Run from the repo root:  .venv/bin/python -m dashboard.server
 """
 import json
+import re
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -21,22 +23,30 @@ from urllib.parse import unquote, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from agent.observability import ARTIFACT_DIR, ReplayStore  # noqa: E402
+from agent.observability import ARTIFACT_DIR, EVIDENCE_DIR, ReplayStore  # noqa: E402
 
 INDEX = ROOT / "dashboard" / "index.html"
 SHOTS = ROOT / "dashboard" / "screenshots"
 PORT = 8123
 MOCK_URL = "http://localhost:9000/"
 
-# The mock pages a deactivate_member replay path can touch, in order.
-PAGE_SHOTS = [
-    ("search", "Search page"),
-    ("detail", "Member detail"),
-    ("confirm", "Deactivation confirm"),
-    ("success", "Result — success"),
-    ("no_such_member", "Result — no such member"),
-    ("access_denied", "Result — access denied"),
-]
+# The mock pages each capability's replay path can touch, in order.
+# Keyed by capability name so each task shows only the pages it actually visits.
+SHOT_MAP = {
+    "deactivate_member": [
+        ("search", "Search page"),
+        ("detail", "Member detail"),
+        ("confirm", "Deactivation confirm"),
+        ("success", "Result — success"),
+        ("no_such_member", "Result — no such member"),
+        ("access_denied", "Result — access denied"),
+    ],
+    "lookup_member": [
+        ("search", "Search page"),
+        ("detail", "Member detail"),
+        ("no_such_member", "Result — no such member"),
+    ],
+}
 
 
 def _load_capability(name: str):
@@ -104,7 +114,8 @@ def _task_detail(cap) -> dict:
         "steps": steps,
         "screenshots": [
             {"id": pid, "label": label, "url": f"/api/screenshots/{pid}.png"}
-            for pid, label in PAGE_SHOTS if (SHOTS / f"{pid}.png").exists()
+            for pid, label in SHOT_MAP.get(cap.meta.name, [])
+            if (SHOTS / f"{pid}.png").exists()
         ],
         "runs": _run_stats(cap.meta.name),
     }
@@ -128,9 +139,124 @@ def _run_task(name: str, inputs: dict) -> dict:
         "task": name,
         "result": run.result,
         "diagnostic": run.diagnostic,
+        "outputs": run.outputs,
         "screenshot": f"/api/screenshots/{shot}",
         "inputs": inputs,
         "duration_ms": run.duration_ms,
+    }
+
+
+def _slugify(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")[:40]
+
+
+def _infer_params(discovery: dict):
+    """Return (input_specs, value_params) from a discovery transcript's `type` steps.
+
+    The param name for a typed value is the extracted output whose value equals
+    it, else `param_N`. Mirrors artifact.auto_serialize's input inference.
+    """
+    outputs = discovery.get("outputs", {}) or {}
+    value_to_param = {str(v): str(k) for k, v in outputs.items()}
+    input_specs: list[dict] = []
+    value_params: dict[str, str] = {}
+    seen: dict[str, str] = {}
+    param_i = 0
+    for s in discovery.get("steps", []):
+        if s.get("action") != "type" or s.get("value") is None:
+            continue
+        val = str(s["value"])
+        if val in value_to_param:
+            pname = value_to_param[val]
+        elif val in seen:
+            pname = seen[val]
+        else:
+            param_i += 1
+            pname = f"param_{param_i}"
+            seen[val] = pname
+        value_params[val] = pname
+        if pname not in [i["name"] for i in input_specs]:
+            input_specs.append({"name": pname, "type": "str", "required": True})
+    return input_specs, value_params
+
+
+def _discover_task(url: str, task: str, name: str = "") -> dict:
+    """Run a full discovery -> auto-record -> verify pipeline for a new task.
+
+    Given a start URL and a natural-language description, drives the LLM through
+    the site to discover the flow, distills it into a Capability (no hand-written
+    metadata), persists it, then immediately replays it once to verify.
+    """
+    from playwright.sync_api import sync_playwright
+
+    from agent.artifact import auto_serialize
+    from agent.loop import run_discovery
+    from agent.replay import replay
+
+    url = url.strip() or MOCK_URL
+    task = (task or "").strip()
+    if not task:
+        raise ValueError("task description is required")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(url)
+        discovery = run_discovery(page, task)
+        browser.close()
+
+    if discovery.get("status") != "success":
+        return {
+            "ok": False,
+            "error": f"discovery ended with '{discovery.get('status')}': {discovery.get('reason', '')}",
+            "steps": len(discovery.get("steps", [])),
+        }
+
+    name = (name or "").strip() or (_slugify(task) or "task")
+    if (ARTIFACT_DIR / f"{name}.json").exists():
+        name = f"{name}_{int(time.time())}"
+
+    cap = auto_serialize(discovery, name=name, description=task, url=url)
+    if not cap.checkpoint_text:
+        return {
+            "ok": False,
+            "error": "the LLM did not declare a success signal (checkpoint_text) — "
+                     "could not auto-record; please rephrase the task description.",
+            "steps": len(cap.steps),
+        }
+
+    # persist artifact + evidence
+    ARTIFACT_DIR.mkdir(exist_ok=True)
+    EVIDENCE_DIR.mkdir(exist_ok=True)
+    (ARTIFACT_DIR / f"{name}.json").write_text(cap.model_dump_json(indent=2))
+    (EVIDENCE_DIR / f"artifact_{name}.json").write_text(cap.model_dump_json(indent=2))
+    (EVIDENCE_DIR / f"discovery_{name}.json").write_text(
+        json.dumps(discovery, indent=2, default=str)
+    )
+
+    # immediate verification replay using the discovered input values
+    _, value_params = _infer_params(discovery)
+    verify_inputs = {pname: val for val, pname in value_params.items()}
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(MOCK_URL)
+        run = replay(page, cap, inputs=verify_inputs)
+        page.screenshot(path=str(SHOTS / f"run_{name}.png"))
+        browser.close()
+    ReplayStore().record(run)
+
+    return {
+        "ok": True,
+        "name": name,
+        "url": url,
+        "steps": len(cap.steps),
+        "checkpoint_text": cap.checkpoint_text,
+        "inputs": [i.model_dump() for i in cap.inputs],
+        "outputs": [o.model_dump() for o in cap.outputs],
+        "verify_result": run.result,
+        "verify_outputs": run.outputs,
+        "verify_diagnostic": run.diagnostic,
     }
 
 
@@ -199,6 +325,10 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"error": "task required"}, 400)
                     return
                 self._json(_run_task(name, inputs))
+            elif path == "/api/discover":
+                self._json(_discover_task(
+                    data.get("url", ""), data.get("task", ""), data.get("name", "")
+                ))
             else:
                 self._json({"error": "not found"}, 404)
         except Exception as e:

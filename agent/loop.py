@@ -30,6 +30,7 @@ Decide the single next action. Respond with ONLY a JSON object (no markdown, no 
   "expect": "what the page should show after this action (used later for replay assertions)",
   "goal_reached": false,
   "outputs": {},
+  "checkpoint_text": "",
   "reason": ""
 }
 
@@ -38,7 +39,7 @@ Field rules:
 - "value" is required for type (the text to enter) and select (the option).
 - "url" is required for navigate.
 - "expect" describes the expected outcome of this action (e.g. "member detail table visible") — write it for every click/type/navigate.
-- When the goal is satisfied: kind="done", goal_reached=true, and put the extracted results in "outputs".
+- When the goal is satisfied: kind="done", goal_reached=true, and put the extracted results in "outputs". Also set "checkpoint_text" to a short, exact piece of text (3-20 chars) that reliably appears on the page ONLY when the task succeeds — e.g. a heading or status word like "MEMBER DETAIL" or "SUCCESS" (do NOT use punctuation, and use the exact casing shown on the page).
 - When the page shows an error, denial, or unexpected state: kind="fail" and explain in "reason".
 - Take the smallest correct step. Type into a field before clicking its button.
 - Never invent an index that is not in the menu."""
@@ -211,6 +212,7 @@ def run_discovery(page, task: str, max_steps: int = 20, verbose: bool = True,
                 "status": "success",
                 "goal_reached": True,
                 "outputs": decision.get("outputs", {}),
+                "checkpoint_text": decision.get("checkpoint_text", ""),
                 "reason": decision.get("reason", ""),
                 "steps": steps,
             }

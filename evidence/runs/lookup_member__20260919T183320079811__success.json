@@ -1,0 +1,27 @@
+{
+  "capability": "lookup_member",
+  "version": "1.0.0",
+  "inputs": {
+    "member_id": "enc:h2QmoGAUCX+86njrIgPwBCf16ID5UYM5MUWxHwrl9yw="
+  },
+  "result": "success",
+  "outputs": {},
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-19T18:33:20.079811Z",
+  "duration_ms": 195
+}

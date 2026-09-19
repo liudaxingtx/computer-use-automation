@@ -1,0 +1,32 @@
+{
+  "capability": "lookup_robert",
+  "version": "1.0.0",
+  "inputs": {
+    "member_id": "enc:Lcad61MQE/PpAXybWNTk9SM4boeVrUlLypFCR4E7KlQ="
+  },
+  "result": "success",
+  "outputs": {
+    "member_id": "1003",
+    "name": "ROBERT CHEN",
+    "status": "ACTIVE",
+    "balance": "$18,900.00"
+  },
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-19T18:47:53.973704Z",
+  "duration_ms": 215
+}

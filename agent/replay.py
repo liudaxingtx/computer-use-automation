@@ -9,6 +9,8 @@ states (success / business_outcome / failure) using deterministic text signals
 from datetime import datetime, timezone
 from typing import Any, Literal, Optional, cast
 
+import re
+
 from playwright.sync_api import Page
 from pydantic import BaseModel
 
@@ -93,6 +95,50 @@ def _classify(page: Page, cap: Capability) -> Optional[tuple[Result, str]]:
         if p.text in text:
             return ("business_outcome", p.label or p.text)
     return None
+
+
+def _norm(s: str) -> str:
+    """Normalize a label for fuzzy matching: lowercase, alphanumeric only."""
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+def _extract_outputs(page: Page, cap: Capability) -> dict:
+    """Read the declared outputs off the final page after a successful replay.
+
+    Two deterministic strategies (no LLM in the loop):
+      - `extract` (CSS selector) reads the matched element's text directly.
+      - otherwise a key-value table scan: rows with exactly two cells are
+        treated as (label, value) pairs; `label` (or name) selects the value.
+        Matching is normalized (case/spaces/underscores ignored) so a declared
+        field like `member_id` matches an on-page label like `MEMBER ID`.
+
+    Returns {output_name: value}; missing values are None.
+    """
+    out: dict = {}
+    if not cap.outputs:
+        return out
+    kv: dict[str, str] = {}
+    try:
+        for row in page.locator("table tr").all():
+            cells = row.locator("td")
+            if cells.count() == 2:
+                k = cells.nth(0).inner_text().strip()
+                v = cells.nth(1).inner_text().strip()
+                if k:
+                    kv[k] = v
+    except Exception:
+        pass
+    kv_norm = {_norm(k): v for k, v in kv.items()}
+    for o in cap.outputs:
+        if o.extract:
+            try:
+                out[o.name] = page.locator(o.extract).first.inner_text().strip()
+            except Exception:
+                out[o.name] = None
+        else:
+            label = o.label or o.name
+            out[o.name] = kv.get(label) or kv_norm.get(_norm(label))
+    return out
 
 
 def _execute(page: Page, step: Step, inputs: dict, key=None, policy: Optional[SafetyPolicy] = None):
@@ -192,7 +238,7 @@ def replay(page: Page, cap: Capability, inputs: dict,
     # All steps executed without an early outcome — check the success checkpoint.
     text = _page_text(page)
     if cap.checkpoint_text and cap.checkpoint_text in text:
-        return _finish("success")
+        return _finish("success", outputs=_extract_outputs(page, cap))
     diag = (f"checkpoint not reached; expected page text containing "
             f"{cap.checkpoint_text!r}, got page of {len(text)} chars")
     shot = _save_screenshot(page, screenshot_dir, cap.meta.name)

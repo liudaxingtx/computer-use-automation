@@ -1,0 +1,51 @@
+{
+  "status": "success",
+  "goal_reached": true,
+  "outputs": {
+    "member_id": "1003",
+    "name": "ROBERT CHEN",
+    "status": "ACTIVE",
+    "balance": "$18,900.00"
+  },
+  "checkpoint_text": "ROBERT CHEN",
+  "reason": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "ordinal": 1
+      },
+      "value": "1003",
+      "expect": "The textbox shows 1003, ready to search.",
+      "thought": "First enter the member ID 1003 into the textbox before clicking SEARCH.",
+      "after_url": "http://localhost:9000/"
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "SEARCH",
+        "ordinal": 1
+      },
+      "value": null,
+      "expect": "member account detail page or table for member 1003 is shown",
+      "thought": "The member ID 1003 is already entered; click SEARCH to look up the member and view account detail.",
+      "after_url": "http://localhost:9000/search?member_id=1003"
+    },
+    {
+      "step": 3,
+      "action": "done",
+      "target": null,
+      "value": null,
+      "expect": "Member detail for ID 1003 is visible",
+      "thought": "The current page already shows the member detail for member 1003: Robert Chen, Active, balance $18,900.00.",
+      "after_url": "http://localhost:9000/search?member_id=1003"
+    }
+  ]
+}

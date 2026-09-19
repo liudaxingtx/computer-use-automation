@@ -116,6 +116,23 @@
   .result.business_outcome .rlabel { color: var(--amber); }
   .result .rdiag { color: var(--dim); font-size: 12.5px; margin-top: 4px; }
   .result img { margin-top: 10px; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); }
+  .result .outputs { margin-top: 12px; }
+  .result .outputs .olabel { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--dim); margin-bottom: 6px; }
+  .result .outputs pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--violet);
+    overflow-x: auto; white-space: pre; }
+
+  /* register new task */
+  button.register { background: linear-gradient(135deg, var(--violet), #7c3aed); color: #fff; border: none;
+    font-weight: 700; font-size: 13px; padding: 8px 16px; border-radius: 9px; cursor: pointer;
+    box-shadow: 0 0 16px rgba(167,139,250,0.4); white-space: nowrap; }
+  button.register:hover { filter: brightness(1.08); }
+  button.register:disabled { opacity: 0.5; cursor: not-allowed; }
+  .discover .field { width: 100%; margin-bottom: 12px; }
+  .discover .field input, .discover textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--txt); border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none; }
+  .discover textarea { resize: vertical; font-family: inherit; }
+  .discover .field input:focus, .discover textarea:focus { border-color: rgba(167,139,250,0.5); box-shadow: 0 0 0 2px rgba(167,139,250,0.15); }
 
   /* steps */
   .step { border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: 10px;
@@ -174,6 +191,7 @@
       <span class="chip verified">Verified <span class="n" id="sVerified">–</span></span>
       <span class="chip">Unverified <span class="n" id="sUnverified">–</span></span>
     </div>
+    <button class="register" onclick="openDiscover()">+ Register task</button>
   </header>
   <div id="domains"></div>
 </div>
@@ -181,6 +199,31 @@
 <!-- task detail modal -->
 <div class="overlay" id="overlay">
   <div class="modal" id="modal"></div>
+</div>
+
+<!-- register new task modal -->
+<div class="overlay" id="doverlay">
+  <div class="modal discover" id="dmodal">
+    <div class="mhead">
+      <span class="mname">Register new task</span>
+      <button class="close" onclick="$('#doverlay').classList.remove('open')">✕</button>
+    </div>
+    <div class="mdesc">Give a start URL and a plain-English description. The agent explores the site, records the flow as a replayable task, then runs it once to verify.</div>
+    <div class="field">
+      <label>Start URL <span class="req">*</span></label>
+      <input type="text" id="durl" placeholder="http://localhost:9000/">
+    </div>
+    <div class="field">
+      <label>Task description <span class="req">*</span></label>
+      <textarea id="dtask" rows="3" placeholder="e.g. Look up member 1001 and view their account detail"></textarea>
+    </div>
+    <div class="field">
+      <label>Name <span style="color:var(--dim)">(optional — auto-generated)</span></label>
+      <input type="text" id="dname" placeholder="auto">
+    </div>
+    <button class="run" id="dbtn" onclick="submitDiscover()">▶ Discover &amp; record</button>
+    <div class="result" id="dresult"></div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -273,6 +316,14 @@ function renderModal(t) {
       </tbody>
     </table>` : '';
 
+  const outputsHtml = (t.outputs || []).length ? `
+    <table class="ptable">
+      <thead><tr><th>field</th><th>type</th><th>source</th><th>page label</th></tr></thead>
+      <tbody>${(t.outputs || []).map(o => `
+        <tr><td><code>${esc(o.name)}</code></td><td>${esc(o.type)}</td><td>${esc(o.source || '—')}</td><td>${o.label ? `<code>${esc(o.label)}</code>` : (o.extract ? `<code>${esc(o.extract)}</code>` : '—')}</td></tr>`).join('')}
+      </tbody>
+    </table>` : '';
+
   const stepsHtml = (t.steps || []).map((s, i) => {
     const target = s.target || {};
     let loc = '';
@@ -330,6 +381,11 @@ function renderModal(t) {
     </div>
 
     <div class="msection">
+      <h3>Extracted outputs</h3>
+      ${outputsHtml || '<div class="empty">This task declares no outputs.</div>'}
+    </div>
+
+    <div class="msection">
       <h3>Replayable path & locators</h3>
       ${stepsHtml || '<div class="empty">No steps.</div>'}
     </div>
@@ -367,18 +423,69 @@ async function runTest(name) {
   const box = $('#result');
   if (r.error) { toast('Error: ' + r.error); return; }
   box.className = 'result ' + r.result;
+  const outputsHtml = (r.outputs && Object.keys(r.outputs).length)
+    ? `<div class="outputs"><div class="olabel">Extracted data</div><pre>${esc(JSON.stringify(r.outputs, null, 2))}</pre></div>` : '';
   box.innerHTML = `
     <div class="rhead">
       <span class="rlabel">${RESULT[r.result] || r.result}</span>
       <span class="rtime">${r.duration_ms != null ? r.duration_ms + ' ms' : ''}</span>
     </div>
     ${r.diagnostic ? `<div class="rdiag">${esc(r.diagnostic)}</div>` : ''}
+    ${outputsHtml}
     ${r.screenshot ? `<img src="${esc(r.screenshot)}" onerror="this.style.display='none'">` : ''}`;
 }
 
+function openDiscover() {
+  $('#dresult').className = 'result';
+  $('#dresult').innerHTML = '';
+  $('#durl').value = $('#durl').value || 'http://localhost:9000/';
+  $('#doverlay').classList.add('open');
+}
+
+async function submitDiscover() {
+  const url = $('#durl').value.trim();
+  const task = $('#dtask').value.trim();
+  const name = $('#dname').value.trim();
+  if (!task) { toast('Task description is required'); return; }
+  const btn = $('#dbtn');
+  const box = $('#dresult');
+  btn.disabled = true; btn.textContent = 'Discovering… (can take ~30s)';
+  box.className = 'result'; box.style.display = 'block';
+  box.innerHTML = '<div class="rdiag">Running discovery… the agent is exploring the site.</div>';
+  try {
+    const res = await fetch('/api/discover', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, task, name })
+    });
+    const r = await res.json();
+    btn.disabled = false; btn.textContent = '▶ Discover & record';
+    if (!r.ok) {
+      box.className = 'result failure';
+      box.innerHTML = `<div class="rlabel">Failed</div><div class="rdiag">${esc(r.error || 'unknown error')}</div>`;
+      return;
+    }
+    box.className = 'result success';
+    const verifyLabel = RESULT[r.verify_result] || r.verify_result;
+    const outputsHtml = (r.verify_outputs && Object.keys(r.verify_outputs).length)
+      ? `<div class="outputs"><div class="olabel">Extracted data (verification run)</div><pre>${esc(JSON.stringify(r.verify_outputs, null, 2))}</pre></div>` : '';
+    box.innerHTML = `
+      <div class="rhead"><span class="rlabel">Recorded: ${esc(r.name)}</span></div>
+      <div class="rdiag">${r.steps} steps · checkpoint "${esc(r.checkpoint_text)}" · verified: ${verifyLabel}</div>
+      ${outputsHtml}
+      ${r.verify_diagnostic ? `<div class="rdiag">${esc(r.verify_diagnostic)}</div>` : ''}`;
+    loadTasks();
+    toast('Task recorded: ' + r.name);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '▶ Discover & record';
+    box.className = 'result failure';
+    box.innerHTML = `<div class="rlabel">Error</div><div class="rdiag">${esc(String(e))}</div>`;
+  }
+}
+
 $('#overlay').addEventListener('click', e => { if (e.target === $('#overlay')) $('#overlay').classList.remove('open'); });
+$('#doverlay').addEventListener('click', e => { if (e.target === $('#doverlay')) $('#doverlay').classList.remove('open'); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { $('#overlay').classList.remove('open'); $('#lightbox').classList.remove('open'); }
+  if (e.key === 'Escape') { $('#overlay').classList.remove('open'); $('#doverlay').classList.remove('open'); $('#lightbox').classList.remove('open'); }
 });
 
 // lightbox — click any screenshot to zoom

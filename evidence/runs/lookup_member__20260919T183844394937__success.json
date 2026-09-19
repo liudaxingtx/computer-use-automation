@@ -1,0 +1,31 @@
+{
+  "capability": "lookup_member",
+  "version": "1.0.0",
+  "inputs": {
+    "member_id": "enc:AY70MFYHtjMuGiaJEu6vQDFLBJyqcZZEPM+0cfVi01A="
+  },
+  "result": "success",
+  "outputs": {
+    "name": "JANE DOE",
+    "status": "RESTRICTED",
+    "balance": "$12.80"
+  },
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-19T18:38:44.394937Z",
+  "duration_ms": 193
+}

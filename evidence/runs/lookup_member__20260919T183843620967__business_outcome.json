@@ -1,0 +1,27 @@
+{
+  "capability": "lookup_member",
+  "version": "1.0.0",
+  "inputs": {
+    "member_id": "enc:oOjvXNO4rrhmKe6er37+z6O+heCSys9sl1px1CVy9QY="
+  },
+  "result": "business_outcome",
+  "outputs": {},
+  "diagnostic": "member not found",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "ok": true,
+      "outcome": "business_outcome"
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-19T18:38:43.620967Z",
+  "duration_ms": 245
+}

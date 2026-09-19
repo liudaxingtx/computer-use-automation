@@ -1,0 +1,50 @@
+{
+  "status": "success",
+  "goal_reached": true,
+  "outputs": {
+    "member_id": "1001",
+    "name": "JOHN SMITH",
+    "status": "ACTIVE",
+    "balance": "$4,250.00"
+  },
+  "reason": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "ordinal": 1
+      },
+      "value": "1001",
+      "expect": "The textbox contains '1001'.",
+      "thought": "The member ID field is currently empty. I need to enter '1001' before clicking SEARCH.",
+      "after_url": "http://localhost:9000/"
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "SEARCH",
+        "ordinal": 1
+      },
+      "value": null,
+      "expect": "Member detail page for member 1001 is displayed with account details and a deactivate option.",
+      "thought": "Member ID 1001 is already entered in the textbox; click SEARCH to look up the member and view account detail.",
+      "after_url": "http://localhost:9000/search?member_id=1001"
+    },
+    {
+      "step": 3,
+      "action": "done",
+      "target": null,
+      "value": null,
+      "expect": "Member detail page displayed",
+      "thought": "The member detail page for member 1001 is already displayed with ID, name, status, and balance. The task is complete; do not click deactivate.",
+      "after_url": "http://localhost:9000/search?member_id=1001"
+    }
+  ]
+}
