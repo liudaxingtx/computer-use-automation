@@ -130,6 +130,7 @@ def _run_task(name: str, inputs: dict) -> dict:
         "diagnostic": run.diagnostic,
         "screenshot": f"/api/screenshots/{shot}",
         "inputs": inputs,
+        "duration_ms": run.duration_ms,
     }
 
 

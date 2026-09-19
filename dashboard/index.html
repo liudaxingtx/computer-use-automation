@@ -93,6 +93,20 @@
   button.run:hover { filter: brightness(1.08); }
   button.run:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* swagger-style endpoint + params table */
+  .endpoint { display: flex; align-items: center; gap: 9px; background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; margin-bottom: 12px; }
+  .method { font-weight: 800; font-size: 11px; color: var(--green); letter-spacing: 0.5px; }
+  .path { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--txt); }
+  .epname { margin-left: auto; font-size: 11px; color: var(--dim); }
+  .ptable { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+  .ptable th { text-align: left; color: var(--dim); font-weight: 600; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.6px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .ptable td { padding: 7px 8px; border-bottom: 1px solid var(--line); color: var(--txt); }
+  .ptable code { font-family: ui-monospace, Menlo, monospace; color: var(--violet); }
+  .rhead { display: flex; align-items: center; gap: 10px; }
+  .rtime { margin-left: auto; font-size: 12px; color: var(--dim); font-family: ui-monospace, Menlo, monospace; }
+
   .result { margin-top: 14px; border-radius: 12px; padding: 14px 16px; border: 1px solid var(--line); display: none; }
   .result.success { display: block; border-color: rgba(52,211,153,0.4); background: rgba(52,211,153,0.06); }
   .result.failure { display: block; border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.06); }
@@ -233,6 +247,14 @@ function renderModal(t) {
       ${i.description ? `<span class="hint">${esc(i.description)}</span>` : ''}
     </div>`).join('');
 
+  const paramsTable = (t.inputs || []).length ? `
+    <table class="ptable">
+      <thead><tr><th>parameter</th><th>type</th><th>required</th><th>description</th></tr></thead>
+      <tbody>${(t.inputs || []).map(i => `
+        <tr><td><code>${esc(i.name)}</code></td><td>${esc(i.type)}</td><td>${i.required ? 'yes' : 'no'}</td><td>${esc(i.description || '—')}</td></tr>`).join('')}
+      </tbody>
+    </table>` : '';
+
   const stepsHtml = (t.steps || []).map((s, i) => {
     const target = s.target || {};
     let loc = '';
@@ -277,9 +299,15 @@ function renderModal(t) {
     <div class="mdesc">${esc(t.description)}${t.checkpoint ? ' · Checkpoint: ' + esc(t.checkpoint) : ''}</div>
 
     <div class="msection">
-      <h3>Run a test — fill inputs</h3>
+      <h3>Interface — try it out</h3>
+      <div class="endpoint">
+        <span class="method">POST</span>
+        <span class="path">/run</span>
+        <span class="epname">${esc(t.name)}</span>
+      </div>
+      ${paramsTable ? `<div class="params">${paramsTable}</div>` : ''}
       <div class="inputs">${inputsHtml || '<span class="empty">This task takes no inputs.</span>'}</div>
-      <button class="run" style="margin-top:12px" onclick="runTest('${esc(t.name)}')">▶ Run test</button>
+      <button class="run" style="margin-top:12px" onclick="runTest('${esc(t.name)}')">▶ Execute</button>
       <div class="result" id="result"></div>
     </div>
 
@@ -309,16 +337,22 @@ async function runTest(name) {
   document.querySelectorAll('[data-input]').forEach(el => {
     if (el.value.trim() !== '') inputs[el.dataset.input] = el.value.trim();
   });
+  const btn = document.querySelector('button.run');
+  btn.disabled = true; btn.textContent = 'Executing…';
   const res = await fetch('/api/run', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ task: name, inputs })
   });
   const r = await res.json();
+  btn.disabled = false; btn.textContent = '▶ Execute';
   const box = $('#result');
   if (r.error) { toast('Error: ' + r.error); return; }
   box.className = 'result ' + r.result;
   box.innerHTML = `
-    <div class="rlabel">${RESULT[r.result] || r.result}</div>
+    <div class="rhead">
+      <span class="rlabel">${RESULT[r.result] || r.result}</span>
+      <span class="rtime">${r.duration_ms != null ? r.duration_ms + ' ms' : ''}</span>
+    </div>
     ${r.diagnostic ? `<div class="rdiag">${esc(r.diagnostic)}</div>` : ''}
     ${r.screenshot ? `<img src="${esc(r.screenshot)}" onerror="this.style.display='none'">` : ''}`;
 }
