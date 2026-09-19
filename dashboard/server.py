@@ -23,7 +23,7 @@ from urllib.parse import unquote, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from agent.observability import ARTIFACT_DIR, EVIDENCE_DIR, ReplayStore  # noqa: E402
+from agent.observability import ARTIFACT_DIR, EVIDENCE_DIR, RUNS_DIR, ReplayStore  # noqa: E402
 
 INDEX = ROOT / "dashboard" / "index.html"
 SHOTS = ROOT / "dashboard" / "screenshots"
@@ -135,6 +135,9 @@ def _run_task(name: str, inputs: dict) -> dict:
         run = replay(page, cap, inputs=inputs, screenshot_dir=str(SHOTS))
         page.screenshot(path=str(SHOTS / shot))
         browser.close()
+    # Persist every invocation so the call-log / monitoring view can answer
+    # "how many times was this task really used, and what happened".
+    ReplayStore().record(run)
     return {
         "task": name,
         "result": run.result,
@@ -143,6 +146,85 @@ def _run_task(name: str, inputs: dict) -> dict:
         "screenshot": f"/api/screenshots/{shot}",
         "inputs": inputs,
         "duration_ms": run.duration_ms,
+    }
+
+
+def _runs_json() -> dict:
+    """Call-log for the monitoring view: every recorded run, newest first, with
+    decrypted inputs, plus aggregate stats (total / success / business / failure).
+    """
+    store = ReplayStore()
+    entries = []
+    if store.directory.exists():
+        for f in sorted(store.directory.glob("*.json")):
+            try:
+                run = store.load(f.stem, decrypt=True)
+            except Exception:
+                continue
+            entries.append((f.stem, run))
+    entries.sort(key=lambda x: x[1].started_at, reverse=True)
+
+    runs = []
+    for run_id, run in entries:
+        runs.append({
+            "id": run_id,
+            "capability": run.capability,
+            "version": run.version,
+            "result": run.result,
+            "inputs": run.inputs,
+            "outputs": run.outputs,
+            "diagnostic": run.diagnostic,
+            "started_at": run.started_at.isoformat(),
+            "duration_ms": run.duration_ms,
+        })
+
+    by_task: dict[str, dict] = {}
+    for r in runs:
+        s = by_task.setdefault(r["capability"],
+                               {"total": 0, "success": 0, "business_outcome": 0, "failure": 0})
+        s["total"] += 1
+        s[r["result"]] += 1
+
+    return {
+        "total": len(runs),
+        "success": sum(1 for r in runs if r["result"] == "success"),
+        "business_outcome": sum(1 for r in runs if r["result"] == "business_outcome"),
+        "failure": sum(1 for r in runs if r["result"] == "failure"),
+        "by_task": by_task,
+        "runs": runs,
+    }
+
+
+def _delete_task(name: str) -> dict:
+    """Delete a recorded task and everything tied to it: the artifact, its
+    evidence copies, the discovery log, and every recorded run (call history).
+    Returns what was removed so the UI can confirm the result."""
+    if not (ARTIFACT_DIR / f"{name}.json").exists():
+        return {"ok": False, "error": f"task '{name}' not found"}
+
+    removed = []
+    for p in (ARTIFACT_DIR / f"{name}.json",
+              EVIDENCE_DIR / f"artifact_{name}.json",
+              EVIDENCE_DIR / f"discovery_{name}.json"):
+        if p.exists():
+            p.unlink()
+            removed.append(p.name)
+
+    runs_removed = 0
+    if RUNS_DIR.exists():
+        for f in RUNS_DIR.glob(f"{name}__*.json"):
+            f.unlink()
+            runs_removed += 1
+
+    for f in SHOTS.glob(f"run_{name}.png"):
+        if f.exists():
+            f.unlink()
+
+    return {
+        "ok": True,
+        "name": name,
+        "files_removed": len(removed) + runs_removed,
+        "runs_removed": runs_removed,
     }
 
 
@@ -298,6 +380,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(INDEX.read_bytes(), "text/html; charset=utf-8")
         elif path == "/api/tasks":
             self._json(build_tasks())
+        elif path == "/api/runs":
+            self._json(_runs_json())
         elif path.startswith("/api/task/"):
             name = unquote(path[len("/api/task/"):])
             try:
@@ -333,6 +417,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "not found"}, 404)
         except Exception as e:
             self._json({"error": str(e)}, 500)
+
+    def do_DELETE(self) -> None:
+        path = urlparse(self.path).path
+        if path.startswith("/api/task/"):
+            name = unquote(path[len("/api/task/"):])
+            try:
+                self._json(_delete_task(name))
+            except Exception as e:
+                self._json({"error": str(e)}, 500)
+        else:
+            self._json({"error": "not found"}, 404)
 
     def log_message(self, format, *args) -> None:
         pass

@@ -134,6 +134,42 @@
   .discover textarea { resize: vertical; font-family: inherit; }
   .discover .field input:focus, .discover textarea:focus { border-color: rgba(167,139,250,0.5); box-shadow: 0 0 0 2px rgba(167,139,250,0.15); }
 
+  /* call log / monitoring */
+  button.calllog { background: linear-gradient(135deg, var(--cyan), #2563eb); color: #06121f; border: none;
+    font-weight: 700; font-size: 13px; padding: 8px 16px; border-radius: 9px; cursor: pointer;
+    box-shadow: 0 0 16px rgba(56,189,248,0.4); white-space: nowrap; }
+  button.calllog:hover { filter: brightness(1.08); }
+  .clog-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .clog-stat { font-size: 13px; color: var(--dim); }
+  .clog-stat b { color: var(--txt); font-weight: 700; }
+  .clog-stat .ok { color: var(--green); } .clog-stat .bo { color: var(--amber); } .clog-stat .fl { color: var(--red); }
+  .clog-tasks { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .calllist { display: flex; flex-direction: column; gap: 8px; max-height: 58vh; overflow-y: auto; }
+  .callrow { border: 1px solid var(--line); border-left: 3px solid var(--dim); border-radius: 10px;
+    padding: 10px 14px; background: var(--panel-2); }
+  .callrow.success { border-left-color: var(--green); }
+  .callrow.business_outcome { border-left-color: var(--amber); }
+  .callrow.failure { border-left-color: var(--red); }
+  .cr-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .cr-head .cname { font-weight: 700; font-size: 13.5px; }
+  .cr-head .ctime { font-size: 11.5px; color: var(--dim); font-family: ui-monospace, Menlo, monospace; }
+  .cr-head .cdur { margin-left: auto; font-size: 11.5px; color: var(--dim); font-family: ui-monospace, Menlo, monospace; }
+  .cr-body { margin-top: 7px; font-size: 12px; color: var(--dim); font-family: ui-monospace, Menlo, monospace; word-break: break-all; }
+  .cr-body .kv { color: var(--txt); }
+  .cr-body .cdiag { color: var(--red); }
+  .cr-body .coutputs { color: var(--violet); }
+
+  /* delete + confirm */
+  button.danger { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.4);
+    font-weight: 700; font-size: 12.5px; padding: 6px 14px; border-radius: 8px; cursor: pointer; }
+  button.danger:hover { background: rgba(248,113,113,0.22); }
+  button.danger.solid { background: var(--red); color: #1a0505; border: none; padding: 9px 18px; font-size: 13px; border-radius: 8px; }
+  button.danger.solid:hover { filter: brightness(1.08); }
+  button.cancel { background: var(--panel-2); color: var(--dim); border: 1px solid var(--line); font-weight: 600;
+    font-size: 13px; padding: 9px 16px; border-radius: 8px; cursor: pointer; }
+  button.cancel:hover { color: var(--txt); border-color: rgba(120,160,220,0.4); }
+  .confirm-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
   /* steps */
   .step { border: 1px solid var(--line); border-left: 3px solid var(--cyan); border-radius: 10px;
     padding: 12px 14px; background: var(--panel-2); margin-bottom: 8px; }
@@ -192,6 +228,7 @@
       <span class="chip">Unverified <span class="n" id="sUnverified">–</span></span>
     </div>
     <button class="register" onclick="openDiscover()">+ Register task</button>
+    <button class="calllog" onclick="openCallLog()">Call log</button>
   </header>
   <div id="domains"></div>
 </div>
@@ -228,6 +265,30 @@
 
 <div class="toast" id="toast"></div>
 <div class="lightbox" id="lightbox"><img id="lightboxImg" alt=""><div class="lcap" id="lightboxCap"></div></div>
+
+<!-- call log / monitoring modal -->
+<div class="overlay" id="cloverlay">
+  <div class="modal" id="clmodal">
+    <div class="mhead">
+      <span class="mname">Call log</span>
+      <button class="close" onclick="$('#cloverlay').classList.remove('open')">✕</button>
+    </div>
+    <div class="mdesc">Every invocation of a recorded task — how many times it ran, whether it succeeded, and the exact inputs used (including failures).</div>
+    <div id="clbody"></div>
+  </div>
+</div>
+
+<!-- delete confirmation modal -->
+<div class="overlay" id="cfmoverlay">
+  <div class="modal" style="max-width:440px">
+    <div class="mhead"><span class="mname">Delete task?</span></div>
+    <div class="mdesc" id="cfmDesc"></div>
+    <div class="confirm-actions">
+      <button class="cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="danger solid" onclick="doDelete()">Delete</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -363,6 +424,7 @@ function renderModal(t) {
       <span class="mname">${esc(t.name)}</span>
       <span class="ver">v${esc(t.version)}</span>
       <span class="badge verified" style="background:rgba(56,189,248,0.12);color:var(--cyan)">${esc(t.domain || 'unknown')}</span>
+      <button class="danger" onclick="askDelete('${esc(t.name)}')">Delete</button>
       <button class="close" onclick="$('#overlay').classList.remove('open')">✕</button>
     </div>
     <div class="mdesc">${esc(t.description)}${t.checkpoint ? ' · Checkpoint: ' + esc(t.checkpoint) : ''}</div>
@@ -484,9 +546,97 @@ async function submitDiscover() {
 
 $('#overlay').addEventListener('click', e => { if (e.target === $('#overlay')) $('#overlay').classList.remove('open'); });
 $('#doverlay').addEventListener('click', e => { if (e.target === $('#doverlay')) $('#doverlay').classList.remove('open'); });
+$('#cloverlay').addEventListener('click', e => { if (e.target === $('#cloverlay')) $('#cloverlay').classList.remove('open'); });
+$('#cfmoverlay').addEventListener('click', e => { if (e.target === $('#cfmoverlay')) closeConfirm(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { $('#overlay').classList.remove('open'); $('#doverlay').classList.remove('open'); $('#lightbox').classList.remove('open'); }
+  if (e.key === 'Escape') { $('#overlay').classList.remove('open'); $('#doverlay').classList.remove('open'); $('#cloverlay').classList.remove('open'); closeConfirm(); $('#lightbox').classList.remove('open'); }
 });
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return esc(iso);
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+async function openCallLog() {
+  $('#cloverlay').classList.add('open');
+  $('#clbody').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await fetch('/api/runs');
+    const d = await res.json();
+    renderCallLog(d);
+  } catch (e) {
+    $('#clbody').innerHTML = `<div class="empty">Error: ${esc(String(e))}</div>`;
+  }
+}
+
+function renderCallLog(d) {
+  const stats = `<div class="clog-head">
+    <span class="clog-stat">Total <b>${d.total ?? 0}</b></span>
+    <span class="clog-stat"><span class="ok"><b>${d.success ?? 0}</b> success</span></span>
+    <span class="clog-stat"><span class="bo"><b>${d.business_outcome ?? 0}</b> business</span></span>
+    <span class="clog-stat"><span class="fl"><b>${d.failure ?? 0}</b> failed</span></span>
+  </div>`;
+
+  const taskChips = Object.keys(d.by_task || {}).sort().map(t => {
+    const s = d.by_task[t];
+    const fail = s.failure ? ` <span style="color:var(--red)">${s.failure}✗</span>` : '';
+    return `<span class="chip">${esc(t)} · <span class="n">${s.total}</span> <span style="color:var(--green)">${s.success}✓</span>${fail}</span>`;
+  }).join('');
+
+  const rows = (d.runs || []).map(r => {
+    const inputsJson = (r.inputs && Object.keys(r.inputs).length) ? esc(JSON.stringify(r.inputs)) : '—';
+    const outputsJson = (r.outputs && Object.keys(r.outputs).length) ? esc(JSON.stringify(r.outputs)) : '';
+    return `<div class="callrow ${r.result}">
+      <div class="cr-head">
+        <span class="pill ${r.result}">${RESULT[r.result] || r.result}</span>
+        <span class="cname">${esc(r.capability)}</span>
+        <span class="ctime">${fmtTime(r.started_at)}</span>
+        <span class="cdur">${r.duration_ms != null ? r.duration_ms + 'ms' : ''}</span>
+      </div>
+      <div class="cr-body">inputs: <span class="kv">${inputsJson}</span></div>
+      ${r.diagnostic ? `<div class="cr-body"><span class="cdiag">✗ ${esc(r.diagnostic)}</span></div>` : ''}
+      ${outputsJson ? `<div class="cr-body"><span class="coutputs">outputs: ${outputsJson}</span></div>` : ''}
+    </div>`;
+  }).join('');
+
+  $('#clbody').innerHTML = stats
+    + (taskChips ? `<div class="clog-tasks">${taskChips}</div>` : '')
+    + `<div class="calllist">${rows || '<div class="empty">No calls recorded yet.</div>'}</div>`;
+}
+
+let pendingDelete = null;
+
+function askDelete(name) {
+  pendingDelete = name;
+  $('#cfmDesc').innerHTML = `This will delete <b>${esc(name)}</b> and all of its recorded call history. This cannot be undone.`;
+  $('#cfmoverlay').classList.add('open');
+}
+
+function closeConfirm() {
+  $('#cfmoverlay').classList.remove('open');
+  pendingDelete = null;
+}
+
+async function doDelete() {
+  const name = pendingDelete;
+  if (!name) return;
+  try {
+    const res = await fetch('/api/task/' + encodeURIComponent(name), { method: 'DELETE' });
+    const r = await res.json();
+    closeConfirm();
+    if (r.ok) {
+      $('#overlay').classList.remove('open');
+      loadTasks();
+      toast(`Deleted ${r.name} (${r.runs_removed} runs removed)`);
+    } else {
+      toast('Error: ' + (r.error || 'delete failed'));
+    }
+  } catch (e) {
+    closeConfirm();
+    toast('Error: ' + String(e));
+  }
+}
 
 // lightbox — click any screenshot to zoom
 function openLightbox(src, cap) {
