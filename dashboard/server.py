@@ -191,8 +191,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    print(f"task dashboard on http://localhost:{PORT}")
-    HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    print(f"task dashboard on http://localhost:{PORT}  (LAN: http://<this-mac-ip>:{PORT})")
+    HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 
 if __name__ == "__main__":
