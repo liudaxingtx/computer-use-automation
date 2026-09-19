@@ -13,6 +13,7 @@ import argparse
 from pathlib import Path
 
 from .artifact import Capability
+from .observability import ReplayStore, replay_case
 
 ARTIFACT_DIR = Path("artifacts")
 
@@ -79,6 +80,46 @@ def cmd_verify(args) -> None:
         print(f"  diagnostic: {run.diagnostic}")
 
 
+def cmd_telemetry() -> None:
+    """Success / business-outcome / failure rates per capability+version."""
+    stats = ReplayStore().telemetry()
+    if not stats:
+        print("(no replay runs recorded)")
+        return
+    for s in stats:
+        print(f"{s['capability']:20} v{s['version']}  total={s['total']}  "
+              f"success={s['success']} business={s['business_outcome']} "
+              f"failure={s['failure']}  success_rate={s['success_rate']:.0%}")
+
+
+def cmd_failures() -> None:
+    """The failure inbox: every unresolved non-success run."""
+    fails = ReplayStore().failures(unresolved_only=True)
+    if not fails:
+        print("(failure inbox empty)")
+        return
+    for run_id, run in fails:
+        print(f"{run_id}")
+        print(f"    {run.diagnostic[:120]}")
+
+
+def cmd_replay_case(args) -> None:
+    """Replay-the-error: reproduce a failure with its original inputs."""
+    store = ReplayStore()
+    run = store.load(args.run_id)
+    print(f"replaying {args.run_id} ({run.capability} v{run.version}, "
+          f"inputs={run.inputs})")
+    new_run = replay_case(run, screenshot_dir="evidence/screenshots")
+    print(f"  -> {new_run.result}  {new_run.diagnostic or ''}")
+    if new_run.result != "failure":
+        print("  case now passes — mark it resolved: artifact resolve <id>")
+
+
+def cmd_resolve(args) -> None:
+    ReplayStore().mark_resolved(args.run_id)
+    print(f"marked {args.run_id} resolved")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="artifact", description="Manage computer-use artifacts.")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -98,6 +139,15 @@ def main() -> None:
     v.add_argument("name")
     v.add_argument("--input", action="append", default=[], help="key=value input")
 
+    sub.add_parser("telemetry", help="success/business/failure rates per capability")
+    sub.add_parser("failures", help="list the unresolved failure inbox")
+
+    rp = sub.add_parser("replay-case", help="reproduce a failure with its original inputs")
+    rp.add_argument("run_id")
+
+    rs = sub.add_parser("resolve", help="mark a failure case resolved")
+    rs.add_argument("run_id")
+
     args = parser.parse_args()
     if args.cmd == "list":
         cmd_list()
@@ -107,6 +157,14 @@ def main() -> None:
         cmd_bump(args)
     elif args.cmd == "verify":
         cmd_verify(args)
+    elif args.cmd == "telemetry":
+        cmd_telemetry()
+    elif args.cmd == "failures":
+        cmd_failures()
+    elif args.cmd == "replay-case":
+        cmd_replay_case(args)
+    elif args.cmd == "resolve":
+        cmd_resolve(args)
 
 
 if __name__ == "__main__":

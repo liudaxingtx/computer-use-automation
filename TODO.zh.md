@@ -15,6 +15,7 @@
 | 2026-09-18 | Phase 3 —— artifact（`agent/artifact.py`）：Pydantic `Capability` schema + `serialize`；类型化/版本化/可评审 JSON |
 | 2026-09-18 | Phase 4 —— replay（`agent/replay.py`）：确定性 操作→断言→分支（无 LLM）；三态契约验证通过；ReplayRun 记录 |
 | 2026-09-18 | Phase 5 —— 安全 + 升级 + artifact 管理（`agent/safety.py`、`handoff.py`、`crypto.py`、`cli.py`）：allowlist、AES-256-GCM 加密、handoff、CLI list/edit/bump/verify |
+| 2026-09-19 | Phase 6 —— 证据 & 可观测性（`agent/observability.py`）：ReplayStore（append-only 运行记录、inputs 静态加密）+ 成功率统计 + 失败案例库 + 回放错误；`/evidence/` 放 artifact + discovery 日志 + 3 份 replay（含一次失败）；CLI `telemetry`/`failures`/`replay-case`/`resolve`；修复闭环端到端演示 |
 
 ## 🎯 路线图
 
@@ -46,18 +47,17 @@
 - ✅ 静态加密（AES-256-GCM step 值 + per-tenant 密钥，用时解密）
 
 ### Phase 6 — 证据 & 可观测性
-- ⬜ `/evidence/`：保存的 artifact + discovery 日志 + replay 日志（含一次命中错误）
-- ⬜ 成功率统计、失败案例库、以及 回放错误→修复→复查 的闭环
+- ✅ `/evidence/`：保存的 artifact + discovery 日志 + replay 日志（含一次命中错误）
+- ✅ 成功率统计、失败案例库、以及 回放错误→修复→复查 的闭环
 
 ### Phase 7 — REPORT.md
 - ⬜ 把 `DESIGN.md` 提炼成七个规定标题
 
 ## 🔜 下一步
 
-**Phase 6 —— 证据 & 可观测性。**
+**Phase 7 —— REPORT.md。**
 
-1. `/evidence/`：一个保存的 artifact、一份真实 discovery 日志、几份 replay 日志——含一次命中错误状态的回放
-2. 成功率统计 + 失败案例库 + 回放错误→修复→复查 的闭环
+把 `DESIGN.md` 提炼成七个规定标题。
 
 ## 📦 交作业前
 

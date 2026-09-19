@@ -1,0 +1,77 @@
+{
+  "status": "success",
+  "goal_reached": true,
+  "outputs": {
+    "member_id": "1001",
+    "status": "deactivated",
+    "message": "SUCCESS MEMBER 1001 HAS BEEN DEACTIVATED."
+  },
+  "reason": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "ordinal": 1
+      },
+      "value": "1001",
+      "expect": "The member ID textbox now contains 1001.",
+      "thought": "The page has a textbox for member ID and a SEARCH button. I should first type the member ID 1001 into the textbox before clicking search.",
+      "after_url": "http://localhost:9000/"
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "SEARCH",
+        "ordinal": 1
+      },
+      "value": null,
+      "expect": "Member detail page or results for member 1001 appears.",
+      "thought": "Member ID 1001 has been entered into the textbox; the next step is to click the SEARCH button to retrieve the member detail.",
+      "after_url": "http://localhost:9000/search?member_id=1001"
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "link",
+        "name": "DEACTIVATE ACCOUNT",
+        "ordinal": 1
+      },
+      "value": null,
+      "expect": "deactivation page or confirmation for member 1001 is displayed",
+      "thought": "The member detail for 1001 is visible with status ACTIVE. The next step is to click the 'DEACTIVATE ACCOUNT' link to initiate deactivation.",
+      "after_url": "http://localhost:9000/deactivate?member_id=1001"
+    },
+    {
+      "step": 4,
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "link",
+        "name": "CONFIRM",
+        "ordinal": 1
+      },
+      "value": null,
+      "expect": "Account deactivation confirmation/success page is displayed.",
+      "thought": "We are on the confirmation page for deactivating member 1001. Click CONFIRM to complete deactivation.",
+      "after_url": "http://localhost:9000/do_deactivate?member_id=1001"
+    },
+    {
+      "step": 5,
+      "action": "done",
+      "target": null,
+      "value": null,
+      "expect": "Deactivation complete",
+      "thought": "The page confirms member 1001 has been deactivated successfully.",
+      "after_url": "http://localhost:9000/do_deactivate?member_id=1001"
+    }
+  ]
+}

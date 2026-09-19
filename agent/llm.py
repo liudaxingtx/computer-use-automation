@@ -64,9 +64,11 @@ def kimi_vision(image_b64: str, prompt: str, mime: str = "image/png") -> str:
                 ],
             }
         ],
-        # kimi-k3 is a reasoning model: it only accepts temperature=1.
+        # kimi-k3 is a reasoning model: it only accepts temperature=1, and its
+        # reasoning monologue can consume most of the budget, so leave headroom
+        # for the final `content` answer (image CAPTCHAs especially).
         "temperature": 1,
-        "max_tokens": 1500,
+        "max_tokens": 8192,
     }
     data = _post(config.KIMI_BASE_URL, config.KIMI_API_KEY, payload)
     msg = data["choices"][0]["message"]

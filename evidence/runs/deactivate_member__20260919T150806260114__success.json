@@ -1,0 +1,39 @@
+{
+  "capability": "deactivate_member",
+  "version": "1.0.0",
+  "inputs": {
+    "member_id": "enc:aiXpCTpfPbv3tidOeS2+oRIE38vKyQsCAM9LhsPC2d4="
+  },
+  "result": "success",
+  "outputs": {},
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 4,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-19T15:08:06.260114Z",
+  "duration_ms": 456
+}

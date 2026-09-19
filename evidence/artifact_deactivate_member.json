@@ -1,0 +1,108 @@
+{
+  "meta": {
+    "name": "deactivate_member",
+    "version": "1.0.0",
+    "description": "Look up a member by ID and deactivate their account.",
+    "surface": "browser",
+    "created_at": "2026-09-19T15:08:05.627552Z"
+  },
+  "inputs": [
+    {
+      "name": "member_id",
+      "type": "str",
+      "required": true,
+      "description": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "status",
+      "type": "str",
+      "source": "result page"
+    }
+  ],
+  "checkpoint": "result page shows SUCCESS",
+  "checkpoint_text": "SUCCESS",
+  "business_outcomes": [
+    {
+      "text": "NO SUCH MEMBER",
+      "label": "member not found"
+    }
+  ],
+  "failure_patterns": [
+    {
+      "text": "ACCESS DENIED",
+      "label": "permission denied"
+    }
+  ],
+  "steps": [
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "The page has a textbox for member ID and a SEARCH button. I should first type the member ID 1001 into the textbox before clicking search."
+      },
+      "value": "{member_id}",
+      "assertion": {
+        "expect": "The member ID textbox now contains 1001.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "SEARCH",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "Member ID 1001 has been entered into the textbox; the next step is to click the SEARCH button to retrieve the member detail."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Member detail page or results for member 1001 appears.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "link",
+        "name": "DEACTIVATE ACCOUNT",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "The member detail for 1001 is visible with status ACTIVE. The next step is to click the 'DEACTIVATE ACCOUNT' link to initiate deactivation."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "deactivation page or confirmation for member 1001 is displayed",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "link",
+        "name": "CONFIRM",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "We are on the confirmation page for deactivating member 1001. Click CONFIRM to complete deactivation."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Account deactivation confirmation/success page is displayed.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    }
+  ]
+}

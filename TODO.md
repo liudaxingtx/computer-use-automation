@@ -15,6 +15,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-18 | Phase 3 — artifact (`agent/artifact.py`): Pydantic `Capability` schema + `serialize`; typed/versioned/reviewable JSON |
 | 2026-09-18 | Phase 4 — replay (`agent/replay.py`): deterministic act→assert→branch (no LLM); three-state contract verified; ReplayRun record |
 | 2026-09-18 | Phase 5 — safety + escalation + artifact mgmt (`agent/safety.py`, `handoff.py`, `crypto.py`, `cli.py`): allowlist, AES-256-GCM encryption, handoff, CLI list/edit/bump/verify |
+| 2026-09-19 | Phase 6 — evidence & observability (`agent/observability.py`): ReplayStore (append-only runs, inputs encrypted at rest) + success telemetry + failure inbox + replay-the-error; `/evidence/` with artifact + discovery log + 3 replay runs (incl. one failure); CLI `telemetry`/`failures`/`replay-case`/`resolve`; repair loop demonstrated end-to-end |
 
 ## 🎯 Roadmap
 
@@ -46,18 +47,17 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 - ✅ encryption at rest (AES-256-GCM step values + per-tenant key, decrypt-on-use)
 
 ### Phase 6 — Evidence & observability
-- ⬜ `/evidence/`: saved artifact + discovery log + replay log (one that hits an error)
-- ⬜ success telemetry, a failure inbox, and the replay-the-error → repair → re-verify loop
+- ✅ `/evidence/`: saved artifact + discovery log + replay log (one that hits an error)
+- ✅ success telemetry, a failure inbox, and the replay-the-error → repair → re-verify loop
 
 ### Phase 7 — REPORT.md
 - ⬜ distill `DESIGN.md` into the seven mandated headings
 
 ## 🔜 Next up
 
-**Phase 6 — Evidence & observability.**
+**Phase 7 — REPORT.md.**
 
-1. `/evidence/`: a saved artifact, a real discovery log, and replay logs — including one replay that hits an error state
-2. success telemetry + a failure inbox + the replay-the-error → repair → re-verify loop
+Distill `DESIGN.md` into the seven mandated headings.
 
 ## 📦 Before final submission
 
