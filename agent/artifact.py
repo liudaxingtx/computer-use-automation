@@ -75,6 +75,7 @@ class CapabilityMeta(BaseModel):
     version: str = "1.0.0"
     description: str = ""
     surface: Literal["browser", "desktop"] = "browser"
+    domain: str = ""        # primary domain of the target system (e.g. "bank-a.com") — groups tasks per site
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -104,6 +105,7 @@ def serialize(
     value_params: Optional[dict] = None,
     encrypt_values: bool = False,
     tenant_id: str = "default",
+    domain: str = "",
 ) -> Capability:
     """Distill a discovery run into a Capability.
 
@@ -155,7 +157,7 @@ def serialize(
             checkpoint = last["thought"]
 
     return Capability(
-        meta=CapabilityMeta(name=name, description=description, version=version),
+        meta=CapabilityMeta(name=name, description=description, version=version, domain=domain),
         inputs=[InputSpec(**i) for i in (inputs or [])],
         outputs=[OutputSpec(**o) for o in (outputs or [])],
         checkpoint=checkpoint,

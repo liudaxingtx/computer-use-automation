@@ -60,6 +60,7 @@ def main() -> int:
         business_outcomes=[{"text": "NO SUCH MEMBER", "label": "member not found"}],
         failure_patterns=[{"text": "ACCESS DENIED", "label": "permission denied"}],
         value_params={"1001": "member_id"},
+        domain="localhost:9000",
     )
 
     ARTIFACT_DIR.mkdir(exist_ok=True)

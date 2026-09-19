@@ -1,17 +1,18 @@
-"""Task dashboard — a dark, glowing management page for the computer-use project.
+"""Task (capability) dashboard — a management console for the computer-use system.
 
-Serves:
-  GET  /                  -> the single-page dashboard
-  GET  /api/state         -> aggregated progress + system runtime state
-  POST /api/task/toggle   -> flip a task item done/undone
-  POST /api/resolve       -> mark a failure case resolved
-  POST /api/replay        -> replay-the-error (reproduce a failure)
-  GET  /evidence/<path>   -> serve evidence files (failure screenshots)
+Lists every recorded capability as a *task*, shows its replayable path (the
+distilled steps with their locator strategy), the page screenshots its path
+touches, and lets you fill in inputs and run a replay to test it live.
+
+Endpoints:
+  GET  /api/tasks               -> all tasks + a completion summary
+  GET  /api/task/<name>         -> full detail: steps (locators), inputs, screenshots
+  POST /api/run                 -> {"task": name, "inputs": {...}} -> run a replay
+  GET  /api/screenshots/<file>  -> a page / result screenshot
 
 Run from the repo root:  .venv/bin/python -m dashboard.server
 """
 import json
-import socket
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -20,94 +21,128 @@ from urllib.parse import unquote, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from agent.observability import (  # noqa: E402
-    ARTIFACT_DIR,
-    ReplayStore,
-    replay_case,
-)
+from agent.observability import ARTIFACT_DIR, ReplayStore  # noqa: E402
 
-TASKS = ROOT / "dashboard" / "tasks.json"
 INDEX = ROOT / "dashboard" / "index.html"
+SHOTS = ROOT / "dashboard" / "screenshots"
 PORT = 8123
+MOCK_URL = "http://localhost:9000/"
+
+# The mock pages a deactivate_member replay path can touch, in order.
+PAGE_SHOTS = [
+    ("search", "Search page"),
+    ("detail", "Member detail"),
+    ("confirm", "Deactivation confirm"),
+    ("success", "Result — success"),
+    ("no_such_member", "Result — no such member"),
+    ("access_denied", "Result — access denied"),
+]
 
 
-def load_tasks() -> dict:
-    return json.loads(TASKS.read_text())
+def _load_capability(name: str):
+    from agent.artifact import Capability
+    return Capability.model_validate_json((ARTIFACT_DIR / f"{name}.json").read_text())
 
 
-def save_tasks(tasks: dict) -> None:
-    TASKS.write_text(json.dumps(tasks, indent=2))
+def _capabilities() -> list[dict]:
+    if not ARTIFACT_DIR.exists():
+        return []
+    out = []
+    for f in sorted(ARTIFACT_DIR.glob("*.json")):
+        try:
+            out.append(_load_capability(f.stem))
+        except Exception:
+            continue
+    return out
 
 
-def _mock_up() -> bool:
-    s = socket.socket()
-    s.settimeout(1)
-    try:
-        s.connect(("127.0.0.1", 9000))
-        return True
-    except Exception:
-        return False
-    finally:
-        s.close()
+def _run_stats(name: str) -> dict:
+    stats = {"success": 0, "business_outcome": 0, "failure": 0, "total": 0}
+    for run in ReplayStore().list_runs():
+        if run.capability == name:
+            stats[run.result] += 1
+            stats["total"] += 1
+    return stats
 
 
-def build_state() -> dict:
-    tasks = load_tasks()
-    store = ReplayStore()
-
-    caps = []
-    if ARTIFACT_DIR.exists():
-        from agent.artifact import Capability
-        for f in sorted(ARTIFACT_DIR.glob("*.json")):
-            try:
-                c = Capability.model_validate_json(f.read_text())
-                caps.append({
-                    "name": c.meta.name,
-                    "version": c.meta.version,
-                    "description": c.meta.description,
-                    "steps": len(c.steps),
-                })
-            except Exception:
-                continue
-
-    failures = []
-    for run_id, run in store.failures(unresolved_only=False):
-        failures.append({
-            "run_id": run_id,
-            "diagnostic": run.diagnostic,
-            "screenshot": run.screenshot,
-            "resolved": store.is_resolved(run_id),
-        })
-
-    recent = [
-        {
-            "result": run.result,
-            "capability": run.capability,
-            "started_at": run.started_at.isoformat(),
-            "diagnostic": run.diagnostic,
-        }
-        for run in store.list_runs()[-8:]
-    ][::-1]
-
-    phase_done = sum(1 for p in tasks["phases"] if p["done"])
-    sub_done = sum(1 for s in tasks["submission"] if s["done"])
-
+def _task_summary(cap) -> dict:
+    stats = _run_stats(cap.meta.name)
     return {
-        "phases": tasks["phases"],
-        "submission": tasks["submission"],
-        "progress": {
-            "phase_done": phase_done,
-            "phase_total": len(tasks["phases"]),
-            "sub_done": sub_done,
-            "sub_total": len(tasks["submission"]),
-            "total_done": phase_done + sub_done,
-            "total": len(tasks["phases"]) + len(tasks["submission"]),
+        "name": cap.meta.name,
+        "version": cap.meta.version,
+        "description": cap.meta.description,
+        "domain": cap.meta.domain,
+        "steps_count": len(cap.steps),
+        "inputs": [i.model_dump() for i in cap.inputs],
+        "verified": stats["success"] > 0,
+        "runs": stats,
+    }
+
+
+def _task_detail(cap) -> dict:
+    steps = []
+    for s in cap.steps:
+        target = s.target.model_dump() if s.target else None
+        steps.append({
+            "action": s.action,
+            "value": s.value,
+            "target": target,
+            "assertion": s.assertion.model_dump() if s.assertion else None,
+            "on_error": s.on_error.model_dump() if s.on_error else None,
+        })
+    return {
+        "name": cap.meta.name,
+        "version": cap.meta.version,
+        "description": cap.meta.description,
+        "domain": cap.meta.domain,
+        "inputs": [i.model_dump() for i in cap.inputs],
+        "outputs": [o.model_dump() for o in cap.outputs],
+        "checkpoint": cap.checkpoint,
+        "checkpoint_text": cap.checkpoint_text,
+        "business_outcomes": [b.model_dump() for b in cap.business_outcomes],
+        "failure_patterns": [f.model_dump() for f in cap.failure_patterns],
+        "steps": steps,
+        "screenshots": [
+            {"id": pid, "label": label, "url": f"/api/screenshots/{pid}.png"}
+            for pid, label in PAGE_SHOTS if (SHOTS / f"{pid}.png").exists()
+        ],
+        "runs": _run_stats(cap.meta.name),
+    }
+
+
+def _run_task(name: str, inputs: dict) -> dict:
+    from playwright.sync_api import sync_playwright
+
+    from agent.replay import replay
+
+    cap = _load_capability(name)
+    shot = f"run_{name}.png"
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(MOCK_URL)
+        run = replay(page, cap, inputs=inputs, screenshot_dir=str(SHOTS))
+        page.screenshot(path=str(SHOTS / shot))
+        browser.close()
+    return {
+        "task": name,
+        "result": run.result,
+        "diagnostic": run.diagnostic,
+        "screenshot": f"/api/screenshots/{shot}",
+        "inputs": inputs,
+    }
+
+
+def build_tasks() -> dict:
+    caps = _capabilities()
+    tasks = [_task_summary(c) for c in caps]
+    return {
+        "tasks": tasks,
+        "summary": {
+            "total": len(tasks),
+            "verified": sum(1 for t in tasks if t["verified"]),
+            "unverified": sum(1 for t in tasks if not t["verified"]),
         },
-        "capabilities": caps,
-        "telemetry": store.telemetry(),
-        "failures": failures,
-        "recent": recent,
-        "mock_up": _mock_up(),
     }
 
 
@@ -134,15 +169,19 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
             self._send(INDEX.read_bytes(), "text/html; charset=utf-8")
-        elif path == "/api/state":
-            self._json(build_state())
-        elif path.startswith("/evidence/"):
-            rel = unquote(path[len("/evidence/"):])
-            fp = (ROOT / "evidence" / rel).resolve()
-            base = (ROOT / "evidence").resolve()
-            if str(fp).startswith(str(base)) and fp.is_file():
-                ctype = "image/png" if fp.suffix == ".png" else "application/json"
-                self._send(fp.read_bytes(), ctype)
+        elif path == "/api/tasks":
+            self._json(build_tasks())
+        elif path.startswith("/api/task/"):
+            name = unquote(path[len("/api/task/"):])
+            try:
+                self._json(_task_detail(_load_capability(name)))
+            except Exception as e:
+                self._json({"error": str(e)}, 404)
+        elif path.startswith("/api/screenshots/"):
+            rel = unquote(path[len("/api/screenshots/"):])
+            fp = (SHOTS / rel).resolve()
+            if str(fp).startswith(str(SHOTS.resolve())) and fp.is_file():
+                self._send(fp.read_bytes(), "image/png")
             else:
                 self._json({"error": "not found"}, 404)
         else:
@@ -152,35 +191,13 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             data = self._read_json()
-            if path == "/api/task/toggle":
-                tid = data.get("id")
-                tasks = load_tasks()
-                for group in ("phases", "submission"):
-                    for t in tasks[group]:
-                        if t["id"] == tid:
-                            t["done"] = not t["done"]
-                save_tasks(tasks)
-                self._json(build_state())
-            elif path == "/api/resolve":
-                run_id = data.get("run_id")
-                if not run_id:
-                    self._json({"error": "run_id required"}, 400)
+            if path == "/api/run":
+                name = data.get("task")
+                inputs = data.get("inputs") or {}
+                if not name:
+                    self._json({"error": "task required"}, 400)
                     return
-                ReplayStore().mark_resolved(run_id)
-                self._json(build_state())
-            elif path == "/api/replay":
-                run_id = data.get("run_id")
-                if not run_id:
-                    self._json({"error": "run_id required"}, 400)
-                    return
-                if not _mock_up():
-                    self._json({"error": "mock app not running — start it first "
-                                          "(python3 mock-app/server.py)"}, 503)
-                    return
-                store = ReplayStore()
-                run = store.load(run_id)
-                new_run = replay_case(run, screenshot_dir="evidence/screenshots")
-                self._json({"result": new_run.result, "diagnostic": new_run.diagnostic})
+                self._json(_run_task(name, inputs))
             else:
                 self._json({"error": "not found"}, 404)
         except Exception as e:

@@ -4,7 +4,8 @@
     "version": "1.0.0",
     "description": "Look up a member by ID and deactivate their account.",
     "surface": "browser",
-    "created_at": "2026-09-19T15:08:05.627552Z"
+    "created_at": "2026-09-19T15:08:05.627552Z",
+    "domain": "localhost:9000"
   },
   "inputs": [
     {
