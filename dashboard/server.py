@@ -79,16 +79,29 @@ SHOT_MAP = {
 
 def _load_capability(name: str):
     from agent.artifact import Capability
-    return Capability.model_validate_json((ARTIFACT_DIR / f"{name}.json").read_text())
+    # Prefer the runtime artifact store (artifacts/); fall back to the committed
+    # evidence seed (evidence/artifact_<name>.json) so a fresh clone — where
+    # artifacts/ is git-ignored and absent — still shows every pre-recorded task.
+    p = ARTIFACT_DIR / f"{name}.json"
+    if not p.exists():
+        p = EVIDENCE_DIR / f"artifact_{name}.json"
+    return Capability.model_validate_json(p.read_text())
 
 
 def _capabilities() -> list[dict]:
-    if not ARTIFACT_DIR.exists():
-        return []
+    # Union of the runtime store (takes precedence) and the committed evidence
+    # seed, so the dashboard is complete both in a working tree and after a
+    # fresh clone.
+    names: set[str] = set()
+    if ARTIFACT_DIR.exists():
+        names.update(f.stem for f in ARTIFACT_DIR.glob("*.json"))
+    if EVIDENCE_DIR.exists():
+        for f in EVIDENCE_DIR.glob("artifact_*.json"):
+            names.add(f.stem[len("artifact_"):])
     out = []
-    for f in sorted(ARTIFACT_DIR.glob("*.json")):
+    for name in sorted(names):
         try:
-            out.append(_load_capability(f.stem))
+            out.append(_load_capability(name))
         except Exception:
             continue
     return out

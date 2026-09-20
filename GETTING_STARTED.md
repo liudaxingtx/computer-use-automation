@@ -56,6 +56,8 @@ Only two keys are required; the rest have defaults.
 
 `DEEPSEEK_API_KEY` and `KIMI_API_KEY` come from the environment, never from git — `.env` is git-ignored.
 
+> **You only need the keys to *record new* tasks.** Viewing the seven pre-recorded tasks and replaying them (the core demo) needs **no keys at all** — replay is deterministic, no LLM in the loop. The pre-recorded tasks are committed to `evidence/artifact_*.json`, and the dashboard falls back to that committed seed when the git-ignored `artifacts/` working directory is absent (i.e. on a fresh clone).
+
 ---
 
 ## 4. What you'll see: seven pre-recorded tasks
