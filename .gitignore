@@ -11,6 +11,7 @@ test-results/
 # Env / secrets (never commit API keys)
 .env
 .env.*
+!.env.example
 
 # Runtime artifact store (the CLI's working directory)
 artifacts/

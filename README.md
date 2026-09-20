@@ -2,25 +2,28 @@
 
 > **interface.ai — Engineering take-home project**
 
-A backend integration layer that gives AI agents *hands*: an LLM-driven system that discovers how to operate a legacy (no-API) application, records the successful run as a structured artifact, and replays it deterministically — no LLM in the decision loop — so the agent can invoke it reliably and cheaply in production.
+An LLM-driven system that discovers how to operate a legacy (no-API) application, records the successful run as a structured artifact, and replays it deterministically — no LLM in the loop — so an agent can invoke it reliably and cheaply in production.
 
 ---
 
-## What this repo is
+## Where to start
+
+| Doc | For |
+|---|---|
+| **`GETTING_STARTED.md`** | **Start here** — run it, configure it, verify it, and see what was built and what was deliberately cut |
+| `REPORT.md` | The formal submission write-up (the seven mandated headings) |
+| `DESIGN.md` | The full working design record — the reasoning behind every decision |
+| `TODO.md` | Progress tracker |
+
+## The repo
 
 | Path | Purpose |
 |------|---------|
-| `DESIGN.md` | **Our working design record** — how we understand the problem, the reasoning behind every decision, and our tracked implementation plan. The single source of truth we work from. |
-| `REPORT.md` | Final submission write-up (the 7 mandated headings). Distilled from `DESIGN.md` at the end. |
-| `src/` | The implementation (agent loop, artifact model, replay engine, safety, escalation, evidence). |
-| `evidence/` | Artifacts + logs from a real discovery run and a real replay run. |
-| `mock-app/` | A deliberately hostile local stand-in for a legacy bank back-office system. |
-
-## Status
-
-**Phase 0 — design & strategy** (current). See `DESIGN.md` §10 for the roadmap.
-
----
+| `agent/` | The implementation: discovery loop, artifact model, replay engine, safety, escalation, crypto, observability |
+| `dashboard/` | The task-management dashboard (served at `http://localhost:8123`) |
+| `mock-app/` | A deliberately hostile local stand-in for a legacy bank back-office app |
+| `evidence/` | Artifacts + logs from real discovery and replay runs (append-only) |
+| `scripts/` | One-command tests, evidence/screenshot generators, artifact helpers |
 
 ## The core idea in one line
 
@@ -28,4 +31,4 @@ A backend integration layer that gives AI agents *hands*: an LLM-driven system t
 
 The LLM appears exactly once — during discovery. After that it leaves the loop. What it learned becomes a *capability* the agent calls without re-reasoning about the UI.
 
-Full reasoning: see `DESIGN.md`.
+Full reasoning: `DESIGN.md`. To run it yourself: `GETTING_STARTED.md`.

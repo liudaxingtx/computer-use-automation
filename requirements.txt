@@ -1,0 +1,5 @@
+# Direct runtime dependencies (install with: pip install -r requirements.txt)
+playwright>=1.63
+pydantic>=2.13
+httpx>=0.28
+python-dotenv>=1.2
