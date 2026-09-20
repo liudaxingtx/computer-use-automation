@@ -94,12 +94,14 @@ def _act(page, decision: dict, obs: dict) -> dict:
 
     def _target(el) -> dict:
         # The locator strategy is role+name (accessibility), with an ordinal for
-        # the empty-name fallback. This is what the artifact freezes so replay can
+        # the empty-name fallback and the HTML field name to label the replay
+        # input parameter. This is what the artifact freezes so replay can
         # re-resolve the control without the LLM.
         return {
             "strategy": "accessibility",
             "role": el["role"],
             "name": el["name"],
+            "field": el.get("field", ""),
             "ordinal": el.get("ordinal"),
         }
 

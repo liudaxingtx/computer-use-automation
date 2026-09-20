@@ -1,0 +1,153 @@
+{
+  "meta": {
+    "name": "register_operator",
+    "version": "1.0.0",
+    "description": "Register a new operator account. Type username carol, password secret99, and email carol@example.com into the form, then submit it. Stop when the registration result page is shown.",
+    "surface": "browser",
+    "domain": "localhost:9000",
+    "created_at": "2026-09-20T13:39:25.908252Z"
+  },
+  "start_url": "http://localhost:9000/register",
+  "inputs": [
+    {
+      "name": "username",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "password",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "email",
+      "type": "str",
+      "required": true,
+      "description": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "status",
+      "type": "str",
+      "source": "result page",
+      "label": "status",
+      "extract": ""
+    },
+    {
+      "name": "username",
+      "type": "str",
+      "source": "result page",
+      "label": "username",
+      "extract": ""
+    },
+    {
+      "name": "password",
+      "type": "str",
+      "source": "result page",
+      "label": "password",
+      "extract": ""
+    },
+    {
+      "name": "email",
+      "type": "str",
+      "source": "result page",
+      "label": "email",
+      "extract": ""
+    }
+  ],
+  "checkpoint": "goal reached",
+  "checkpoint_text": "REGISTRATION SUCCESS",
+  "business_outcomes": [
+    {
+      "text": "USERNAME TAKEN",
+      "label": "username already registered"
+    }
+  ],
+  "failure_patterns": [
+    {
+      "text": "INVALID PASSWORD",
+      "label": "password too short"
+    },
+    {
+      "text": "INVALID INPUT",
+      "label": "missing required field"
+    }
+  ],
+  "steps": [
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "username",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "The form has three textboxes in order: username, password, email. I will type the username into the first textbox (index 2) first."
+      },
+      "value": "{username}",
+      "assertion": {
+        "expect": "Username field contains 'carol'",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "password",
+        "ordinal": 2,
+        "value": null,
+        "reasoning": "Username carol is already entered. Next, type the password into the password textbox, which is the second unnamed textbox (index 3)."
+      },
+      "value": "{password}",
+      "assertion": {
+        "expect": "Password field should contain secret99",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "email",
+        "ordinal": 3,
+        "value": null,
+        "reasoning": "The email field is the remaining empty textbox (index 4). Type the email address before submitting."
+      },
+      "value": "{email}",
+      "assertion": {
+        "expect": "Email textbox is filled with carol@example.com on the registration form.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "REGISTER",
+        "field": "",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "All three fields are filled. The next step is to submit the registration form by clicking the REGISTER button."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "registration result page is shown",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    }
+  ]
+}

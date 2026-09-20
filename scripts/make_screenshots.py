@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 OUT = Path("dashboard/screenshots")
 OUT.mkdir(parents=True, exist_ok=True)
 
-# (id, url, label) — the pages a deactivate_member replay can touch.
+# (id, url, label) — the pages a capability's replay can touch.
 PAGES = [
     ("search", "http://localhost:9000/", "Search page"),
     ("detail", "http://localhost:9000/search?member_id=1001", "Member detail"),
@@ -24,6 +24,13 @@ PAGES = [
     ("success", "http://localhost:9000/do_deactivate?member_id=1001", "Result — success"),
     ("no_such_member", "http://localhost:9000/search?member_id=9999", "Result — no such member"),
     ("access_denied", "http://localhost:9000/do_deactivate?member_id=1002", "Result — access denied"),
+    ("register", "http://localhost:9000/register", "Registration form"),
+    ("register_success", "http://localhost:9000/do_register?username=testop&password=secret99&email=t@x.com", "Result — registration success"),
+    ("register_taken", "http://localhost:9000/do_register?username=admin&password=secret99&email=a@x.com", "Result — username taken"),
+    ("register_invalid", "http://localhost:9000/do_register?username=zz&password=abc&email=z@x.com", "Result — invalid password"),
+    ("login", "http://localhost:9000/login", "Login form"),
+    ("login_success", "http://localhost:9000/do_login?username=admin&password=secret123", "Result — login success"),
+    ("login_invalid", "http://localhost:9000/do_login?username=admin&password=wrong", "Result — invalid credentials"),
 ]
 
 

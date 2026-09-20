@@ -46,6 +46,17 @@ SHOT_MAP = {
         ("detail", "Member detail"),
         ("no_such_member", "Result — no such member"),
     ],
+    "register_operator": [
+        ("register", "Registration form"),
+        ("register_success", "Result — registration success"),
+        ("register_taken", "Result — username taken"),
+        ("register_invalid", "Result — invalid password"),
+    ],
+    "login_operator": [
+        ("login", "Login form"),
+        ("login_success", "Result — login success"),
+        ("login_invalid", "Result — invalid credentials"),
+    ],
 }
 
 
@@ -131,7 +142,7 @@ def _run_task(name: str, inputs: dict) -> dict:
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(MOCK_URL)
+        page.goto(cap.start_url or MOCK_URL)
         run = replay(page, cap, inputs=inputs, screenshot_dir=str(SHOTS))
         page.screenshot(path=str(SHOTS / shot))
         browser.close()
@@ -232,36 +243,6 @@ def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")[:40]
 
 
-def _infer_params(discovery: dict):
-    """Return (input_specs, value_params) from a discovery transcript's `type` steps.
-
-    The param name for a typed value is the extracted output whose value equals
-    it, else `param_N`. Mirrors artifact.auto_serialize's input inference.
-    """
-    outputs = discovery.get("outputs", {}) or {}
-    value_to_param = {str(v): str(k) for k, v in outputs.items()}
-    input_specs: list[dict] = []
-    value_params: dict[str, str] = {}
-    seen: dict[str, str] = {}
-    param_i = 0
-    for s in discovery.get("steps", []):
-        if s.get("action") != "type" or s.get("value") is None:
-            continue
-        val = str(s["value"])
-        if val in value_to_param:
-            pname = value_to_param[val]
-        elif val in seen:
-            pname = seen[val]
-        else:
-            param_i += 1
-            pname = f"param_{param_i}"
-            seen[val] = pname
-        value_params[val] = pname
-        if pname not in [i["name"] for i in input_specs]:
-            input_specs.append({"name": pname, "type": "str", "required": True})
-    return input_specs, value_params
-
-
 def _discover_task(url: str, task: str, name: str = "") -> dict:
     """Run a full discovery -> auto-record -> verify pipeline for a new task.
 
@@ -271,7 +252,7 @@ def _discover_task(url: str, task: str, name: str = "") -> dict:
     """
     from playwright.sync_api import sync_playwright
 
-    from agent.artifact import auto_serialize
+    from agent.artifact import auto_serialize, infer_params
     from agent.loop import run_discovery
     from agent.replay import replay
 
@@ -317,12 +298,12 @@ def _discover_task(url: str, task: str, name: str = "") -> dict:
     )
 
     # immediate verification replay using the discovered input values
-    _, value_params = _infer_params(discovery)
+    _, value_params = infer_params(discovery)
     verify_inputs = {pname: val for val, pname in value_params.items()}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(MOCK_URL)
+        page.goto(cap.start_url or url)
         run = replay(page, cap, inputs=verify_inputs)
         page.screenshot(path=str(SHOTS / f"run_{name}.png"))
         browser.close()

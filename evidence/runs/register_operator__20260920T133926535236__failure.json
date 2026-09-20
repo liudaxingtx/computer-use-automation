@@ -1,0 +1,41 @@
+{
+  "capability": "register_operator",
+  "version": "1.0.0",
+  "inputs": {
+    "username": "enc:VEZhroO3HC30Jx97SbKwnJlJV+cJX+byX3mKQXwY+l8l",
+    "password": "enc:XuGJto1r+nsc4oo5i6xWoD2e+K/z0jGNKuFkbfOfVLco7ywo",
+    "email": "enc:f23/37MHQzr4AtaZj5QRZXZzaHlQ1EAI6/66H48VqnrkjbmG4C1p36RvTmIY"
+  },
+  "result": "failure",
+  "outputs": {},
+  "diagnostic": "checkpoint not reached; expected page text containing 'REGISTRATION SUCCESS', got page of 111 chars",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 4,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T13:39:26.535236Z",
+  "duration_ms": 285
+}

@@ -1,0 +1,46 @@
+{
+  "capability": "register_operator",
+  "version": "1.0.0",
+  "inputs": {
+    "username": "enc:XIedB3oHHgDug423FvdtAku6gkpvyrGqfAUI9vbJ8sY=",
+    "password": "enc:XKLJs0uKYnHQcKwBVlg0xEkkLkRhAQur2kfabcL3oRw9omC5",
+    "email": "enc:Ftzh7sq9gr62LUFjkGjzib2BC5EuBqKKRCfZefQVsM6uGnO51Ltd3MTIRAI="
+  },
+  "result": "success",
+  "outputs": {
+    "status": null,
+    "username": null,
+    "password": null,
+    "email": null
+  },
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 4,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T13:40:42.103020Z",
+  "duration_ms": 378
+}

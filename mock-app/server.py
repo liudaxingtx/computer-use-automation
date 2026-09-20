@@ -36,6 +36,12 @@ MEMBERS = {
     "1003": {"name": "ROBERT CHEN", "status": "ACTIVE",     "balance": "$18,900.00"},
 }
 
+# In-memory operator accounts (register/login). `admin` is pre-seeded so login
+# has a known good credential; register adds more at runtime.
+USERS = {
+    "admin": {"password": "secret123", "email": "admin@fiserv.com"},
+}
+
 
 def page(title, body):
     """Wrap content in the same deliberately-legacy chrome on every page."""
@@ -59,6 +65,8 @@ def page(title, body):
 def search_page():
     body = (
         '<font size="4"><b>MEMBER LOOKUP</b></font><br><br>\n'
+        '<font size="2"><a href="/register">REGISTER</a> &nbsp;|&nbsp; '
+        '<a href="/login">LOGIN</a></font><br><br>\n'
         '<form action="/search" method="get">\n'
         '<table border="0" cellpadding="2" cellspacing="2">\n'
         '<tr><td><font size="2">MEMBER ID:</font></td>'
@@ -155,11 +163,83 @@ def img_button_done_page():
     return page("IMAGE GATE", body)
 
 
+def register_form():
+    body = (
+        '<font size="4"><b>OPERATOR REGISTRATION</b></font><br><br>\n'
+        '<form action="/do_register" method="get">\n'
+        '<table border="0" cellpadding="2" cellspacing="2">\n'
+        '<tr><td><font size="2">USERNAME:</font></td>'
+        '<td><input type="text" name="username" size="16"></td></tr>\n'
+        '<tr><td><font size="2">PASSWORD:</font></td>'
+        '<td><input type="password" name="password" size="16"></td></tr>\n'
+        '<tr><td><font size="2">EMAIL:</font></td>'
+        '<td><input type="text" name="email" size="24"></td></tr>\n'
+        '<tr><td>&nbsp;</td>'
+        '<td><input type="submit" value="REGISTER"></td></tr>\n'
+        "</table></form>"
+    )
+    return page("OPERATOR REGISTRATION", body)
+
+
+def do_register(username, password, email):
+    if not username or not password:
+        body = ('<font size="4" color="#cc0000"><b>INVALID INPUT</b></font><br><br>\n'
+                '<font size="2">USERNAME AND PASSWORD ARE REQUIRED.</font><br><br>'
+                '<a href="/register"><font size="2">BACK</font></a>')
+        return page("REGISTER RESULT", body)
+    if username in USERS:
+        body = ('<font size="4" color="#cc0000"><b>USERNAME TAKEN</b></font><br><br>\n'
+                '<font size="2">THAT USERNAME IS ALREADY REGISTERED.</font><br><br>'
+                '<a href="/register"><font size="2">BACK</font></a>')
+        return page("REGISTER RESULT", body)
+    if len(password) < 6:
+        body = ('<font size="4" color="#cc0000"><b>INVALID PASSWORD</b></font><br><br>\n'
+                '<font size="2">PASSWORD MUST BE AT LEAST 6 CHARACTERS.</font><br><br>'
+                '<a href="/register"><font size="2">BACK</font></a>')
+        return page("REGISTER RESULT", body)
+    USERS[username] = {"password": password, "email": email}
+    body = ('<font size="4" color="#008000"><b>REGISTRATION SUCCESS</b></font><br><br>\n'
+            '<font size="2">ACCOUNT ' + username + ' HAS BEEN CREATED.</font><br><br>'
+            '<a href="/login"><font size="2">LOG IN</font></a>')
+    return page("REGISTER RESULT", body)
+
+
+def login_form():
+    body = (
+        '<font size="4"><b>OPERATOR LOGIN</b></font><br><br>\n'
+        '<form action="/do_login" method="get">\n'
+        '<table border="0" cellpadding="2" cellspacing="2">\n'
+        '<tr><td><font size="2">USERNAME:</font></td>'
+        '<td><input type="text" name="username" size="16"></td></tr>\n'
+        '<tr><td><font size="2">PASSWORD:</font></td>'
+        '<td><input type="password" name="password" size="16"></td></tr>\n'
+        '<tr><td>&nbsp;</td>'
+        '<td><input type="submit" value="LOGIN"></td></tr>\n'
+        "</table></form>"
+    )
+    return page("OPERATOR LOGIN", body)
+
+
+def do_login(username, password):
+    if username in USERS and USERS[username]["password"] == password:
+        body = ('<font size="4" color="#008000"><b>LOGIN SUCCESS</b></font><br><br>\n'
+                '<font size="2">WELCOME, ' + username.upper() + '.</font><br><br>'
+                '<a href="/"><font size="2">MEMBER LOOKUP</font></a>')
+        return page("LOGIN RESULT", body)
+    body = ('<font size="4" color="#cc0000"><b>INVALID CREDENTIALS</b></font><br><br>\n'
+            '<font size="2">USERNAME OR PASSWORD IS INCORRECT.</font><br><br>'
+            '<a href="/login"><font size="2">BACK</font></a>')
+    return page("LOGIN RESULT", body)
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         q = parse_qs(parsed.query)
         mid = (q.get("member_id") or [""])[0].strip()
+        username = (q.get("username") or [""])[0].strip()
+        password = (q.get("password") or [""])[0].strip()
+        email = (q.get("email") or [""])[0].strip()
 
         if parsed.path == "/":
             html, code = search_page(), 200
@@ -177,6 +257,14 @@ class Handler(BaseHTTPRequestHandler):
                 html, code = result_denied(mid), 200  # hard failure surfaced as a page state
             else:
                 html, code = result_success(mid), 200
+        elif parsed.path == "/register":
+            html, code = register_form(), 200
+        elif parsed.path == "/do_register":
+            html, code = do_register(username, password, email), 200
+        elif parsed.path == "/login":
+            html, code = login_form(), 200
+        elif parsed.path == "/do_login":
+            html, code = do_login(username, password), 200
         elif parsed.path == "/imgbutton":
             html, code = img_button_page(), 200
         elif parsed.path == "/imgbutton_done":

@@ -1,0 +1,41 @@
+{
+  "capability": "register_operator",
+  "version": "1.0.0",
+  "inputs": {
+    "username": "enc:z/JQOBG2bzA39Re8IQeOQqPzdXEsTQUzvIVB496EgHw=",
+    "password": "enc:+J9SKdFjMF3CsUCBh2B0TrPJcGg3DU7O1sNYFIwCCP/DqA9o",
+    "email": "enc:47rXFlD0lvCW0j/FnToBZ8Y+hbQVvgKAIgZeuYi2vEfeMAhbRMV6gZO0D7Y="
+  },
+  "result": "business_outcome",
+  "outputs": {},
+  "diagnostic": "username already registered",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 4,
+      "action": "click",
+      "ok": true,
+      "outcome": "business_outcome"
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T13:40:43.148737Z",
+  "duration_ms": 281
+}

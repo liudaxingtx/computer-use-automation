@@ -1,0 +1,106 @@
+{
+  "meta": {
+    "name": "login_operator",
+    "version": "1.0.0",
+    "description": "Log in as an operator. Type username admin and password secret123 into the login form, then submit it. Stop when the login result page is shown.",
+    "surface": "browser",
+    "domain": "localhost:9000",
+    "created_at": "2026-09-20T13:40:05.479284Z"
+  },
+  "start_url": "http://localhost:9000/login",
+  "inputs": [
+    {
+      "name": "username",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "password",
+      "type": "str",
+      "required": true,
+      "description": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "username",
+      "type": "str",
+      "source": "result page",
+      "label": "username",
+      "extract": ""
+    },
+    {
+      "name": "login_result",
+      "type": "str",
+      "source": "result page",
+      "label": "login_result",
+      "extract": ""
+    }
+  ],
+  "checkpoint": "goal reached",
+  "checkpoint_text": "LOGIN SUCCESS",
+  "business_outcomes": [
+    {
+      "text": "INVALID CREDENTIALS",
+      "label": "wrong username or password"
+    }
+  ],
+  "failure_patterns": [],
+  "steps": [
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "username",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "The login form has two textboxes. The first textbox (index 2) is for username, so I will type the username into it."
+      },
+      "value": "{username}",
+      "assertion": {
+        "expect": "Username textbox contains 'admin'",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "password",
+        "ordinal": 2,
+        "value": null,
+        "reasoning": "The username was typed into the first textbox (index 2). The next field to fill is the password textbox, which is index 3 in the menu, so type the password there."
+      },
+      "value": "{password}",
+      "assertion": {
+        "expect": "The password textbox should now contain secret123 (usually masked).",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "LOGIN",
+        "field": "",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "Credentials entered; submit the login form by clicking LOGIN."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Login result page is shown after submitting credentials.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    }
+  ]
+}

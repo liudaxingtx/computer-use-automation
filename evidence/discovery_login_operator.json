@@ -1,0 +1,66 @@
+{
+  "status": "success",
+  "goal_reached": true,
+  "outputs": {
+    "username": "admin",
+    "login_result": "success"
+  },
+  "checkpoint_text": "LOGIN SUCCESS",
+  "reason": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "username",
+        "ordinal": 1
+      },
+      "value": "admin",
+      "expect": "Username textbox contains 'admin'",
+      "thought": "The login form has two textboxes. The first textbox (index 2) is for username, so I will type the username into it.",
+      "after_url": "http://localhost:9000/login"
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "password",
+        "ordinal": 2
+      },
+      "value": "secret123",
+      "expect": "The password textbox should now contain secret123 (usually masked).",
+      "thought": "The username was typed into the first textbox (index 2). The next field to fill is the password textbox, which is index 3 in the menu, so type the password there.",
+      "after_url": "http://localhost:9000/login"
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "LOGIN",
+        "field": "",
+        "ordinal": 1
+      },
+      "value": null,
+      "expect": "Login result page is shown after submitting credentials.",
+      "thought": "Credentials entered; submit the login form by clicking LOGIN.",
+      "after_url": "http://localhost:9000/do_login?username=admin&password=secret123"
+    },
+    {
+      "step": 4,
+      "action": "done",
+      "target": null,
+      "value": null,
+      "expect": "Login result page shows LOGIN SUCCESS WELCOME, ADMIN.",
+      "thought": "The login result page is already displayed and shows LOGIN SUCCESS WELCOME, ADMIN, so the task is complete.",
+      "after_url": "http://localhost:9000/do_login?username=admin&password=secret123"
+    }
+  ]
+}

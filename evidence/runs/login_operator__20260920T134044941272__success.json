@@ -1,0 +1,37 @@
+{
+  "capability": "login_operator",
+  "version": "1.0.0",
+  "inputs": {
+    "username": "enc:Lw8FG4dhn1FisC+OKQqKUhh4/8jf89vq4kq+XMUvUvhd",
+    "password": "enc:IIbI7woAxLAP8UgQ0ISigl9rwLNwTEe6Aiv22Kal/FqIgOcZUg=="
+  },
+  "result": "success",
+  "outputs": {
+    "username": null,
+    "login_result": null
+  },
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T13:40:44.941272Z",
+  "duration_ms": 212
+}

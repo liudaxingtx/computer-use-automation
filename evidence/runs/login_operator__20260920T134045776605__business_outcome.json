@@ -1,0 +1,34 @@
+{
+  "capability": "login_operator",
+  "version": "1.0.0",
+  "inputs": {
+    "username": "enc:I65ICUrVWlI5Us/hcRY7shz+h+VnIp1cHmAHtF3Etmtn",
+    "password": "enc:kVYzbYNWwgbiJvo+38o4fyAPlsj/aYogfOZ5FtSNyrg="
+  },
+  "result": "business_outcome",
+  "outputs": {},
+  "diagnostic": "wrong username or password",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "ok": true,
+      "outcome": "business_outcome"
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T13:40:45.776605Z",
+  "duration_ms": 154
+}

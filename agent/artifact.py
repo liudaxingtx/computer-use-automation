@@ -26,6 +26,7 @@ class LocatorStrategy(BaseModel):
     strategy: Strategy = "accessibility"
     role: Optional[str] = None          # accessibility strategy
     name: Optional[str] = None          # accessibility strategy
+    field: Optional[str] = None         # HTML name attribute — labels the replay input param
     ordinal: Optional[int] = None       # 1-based position within the role; fallback when name is empty
     value: Optional[str] = None         # css/xpath expression, or text for 'text' strategy
     reasoning: str = ""                 # why this locator was chosen — for review + repair
@@ -84,6 +85,7 @@ class CapabilityMeta(BaseModel):
 class Capability(BaseModel):
     """A reusable, versioned description of one flow."""
     meta: CapabilityMeta
+    start_url: str = ""                        # page a replay must start from (e.g. /register)
     inputs: list[InputSpec] = []
     outputs: list[OutputSpec] = []
     checkpoint: str = ""                        # human-readable goal description
@@ -108,6 +110,7 @@ def serialize(
     encrypt_values: bool = False,
     tenant_id: str = "default",
     domain: str = "",
+    start_url: str = "",
 ) -> Capability:
     """Distill a discovery run into a Capability.
 
@@ -128,6 +131,7 @@ def serialize(
                 strategy=t.get("strategy", "accessibility"),
                 role=t.get("role"),
                 name=t.get("name"),
+                field=t.get("field"),
                 ordinal=t.get("ordinal"),
                 reasoning=s.get("thought", ""),
             )
@@ -160,6 +164,7 @@ def serialize(
 
     return Capability(
         meta=CapabilityMeta(name=name, description=description, version=version, domain=domain),
+        start_url=start_url,
         inputs=[InputSpec(**i) for i in (inputs or [])],
         outputs=[OutputSpec(**o) for o in (outputs or [])],
         checkpoint=checkpoint,
@@ -175,44 +180,28 @@ def to_json(cap: Capability) -> str:
     return cap.model_dump_json(indent=2)
 
 
-def auto_serialize(discovery: dict, name: str, description: str = "",
-                   url: str = "") -> Capability:
-    """Distill a discovery run into a Capability with NO hand-specified metadata.
+def infer_params(discovery: dict):
+    """Infer (input_specs, value_params) from a discovery transcript's `type` steps.
 
-    Everything is inferred from the discovery transcript:
-      - checkpoint_text: the LLM's `done` decision declares the exact success
-        text that appears on the page (see loop.SYSTEM_PROMPT).
-      - outputs: the fields the LLM extracted at `done`, each keyed by name and
-        matched back to the on-page label (normalized).
-      - inputs: every `type` step is parameterized — its concrete value becomes
-        a `{param}` placeholder. The param name is the extracted output whose
-        value equals the typed value, else `param_N`.
-
-    business_outcomes / failure_patterns are left empty: a discovery run only
-    sees the happy path, so error-state signals are filled in later.
+    Param-name priority:
+      1. the typed control's HTML `field` name (e.g. username / password / email)
+      2. the extracted output whose value equals the typed value
+      3. `param_N` as a last resort
     """
-    from urllib.parse import urlparse
-
     outputs = discovery.get("outputs", {}) or {}
-    steps = discovery.get("steps", [])
-
-    # --- outputs: field name -> on-page label ---
-    output_specs = [
-        {"name": str(k), "type": "str", "source": "result page", "label": str(k)}
-        for k in outputs.keys()
-    ]
-
-    # --- inputs: parameterize each `type` value ---
     value_to_param = {str(v): str(k) for k, v in outputs.items()}
     input_specs: list[dict] = []
     value_params: dict[str, str] = {}
     seen: dict[str, str] = {}
     param_i = 0
-    for s in steps:
+    for s in discovery.get("steps", []):
         if s.get("action") != "type" or s.get("value") is None:
             continue
         val = str(s["value"])
-        if val in value_to_param:
+        field = (s.get("target") or {}).get("field", "") or ""
+        if field:
+            pname = field
+        elif val in value_to_param:
             pname = value_to_param[val]
         elif val in seen:
             pname = seen[val]
@@ -223,7 +212,34 @@ def auto_serialize(discovery: dict, name: str, description: str = "",
         value_params[val] = pname
         if pname not in [i["name"] for i in input_specs]:
             input_specs.append({"name": pname, "type": "str", "required": True})
+    return input_specs, value_params
 
+
+def auto_serialize(discovery: dict, name: str, description: str = "",
+                   url: str = "") -> Capability:
+    """Distill a discovery run into a Capability with NO hand-specified metadata.
+
+    Everything is inferred from the discovery transcript:
+      - checkpoint_text: the LLM's `done` decision declares the exact success
+        text that appears on the page (see loop.SYSTEM_PROMPT).
+      - outputs: the fields the LLM extracted at `done`, each keyed by name and
+        matched back to the on-page label (normalized).
+      - inputs: every `type` step is parameterized (see infer_params).
+      - start_url: the page discovery started from, so replay starts there too.
+
+    business_outcomes / failure_patterns are left empty: a discovery run only
+    sees the happy path, so error-state signals are filled in later.
+    """
+    from urllib.parse import urlparse
+
+    outputs = discovery.get("outputs", {}) or {}
+
+    output_specs = [
+        {"name": str(k), "type": "str", "source": "result page", "label": str(k)}
+        for k in outputs.keys()
+    ]
+
+    input_specs, value_params = infer_params(discovery)
     checkpoint_text = discovery.get("checkpoint_text", "") or ""
     domain = urlparse(url).netloc or ""
 
@@ -239,4 +255,5 @@ def auto_serialize(discovery: dict, name: str, description: str = "",
         failure_patterns=[],
         value_params=value_params,
         domain=domain,
+        start_url=url,
     )

@@ -38,6 +38,15 @@ def _element_name(el) -> str:
     return ""
 
 
+def _field_name(el) -> str:
+    """The HTML `name` attribute, when present — used to name the replay input
+    parameter (e.g. username / password / email on a form)."""
+    try:
+        return (el.get_attribute("name") or "").strip()
+    except Exception:
+        return ""
+
+
 def collect_interactive(page: Page) -> list[dict]:
     """Enumerate every visible interactive element with a stable role+name locator."""
     items = []
@@ -57,6 +66,7 @@ def collect_interactive(page: Page) -> list[dict]:
             items.append({
                 "role": role,
                 "name": _element_name(el),
+                "field": _field_name(el),
                 "ordinal": i + 1,
                 "locator": el,
             })
