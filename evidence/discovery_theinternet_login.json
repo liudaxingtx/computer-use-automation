@@ -1,0 +1,67 @@
+{
+  "status": "success",
+  "goal_reached": true,
+  "outputs": {
+    "logged_in": true,
+    "page_message": "You logged into a secure area!",
+    "heading": "Secure Area"
+  },
+  "checkpoint_text": "Secure Area",
+  "reason": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "username",
+        "ordinal": 1
+      },
+      "value": "tomsmith",
+      "expect": "Username textbox contains tomsmith.",
+      "thought": "Type the username into the first textbox.",
+      "after_url": "https://the-internet.herokuapp.com/login"
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "password",
+        "ordinal": 2
+      },
+      "value": "SuperSecretPassword!",
+      "expect": "Password field contains SuperSecretPassword!",
+      "thought": "The username is already filled in. Type the password into the password textbox next.",
+      "after_url": "https://the-internet.herokuapp.com/login"
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Login",
+        "field": "",
+        "ordinal": 1
+      },
+      "value": null,
+      "expect": "Secure area page is shown after successful login",
+      "thought": "Fill in the login form has been done. The next step is to submit by clicking the Login button.",
+      "after_url": "https://the-internet.herokuapp.com/secure"
+    },
+    {
+      "step": 4,
+      "action": "done",
+      "target": null,
+      "value": null,
+      "expect": "Secure area page is shown",
+      "thought": "The login was submitted and the page now shows the secure area heading and success message. The task is complete.",
+      "after_url": "https://the-internet.herokuapp.com/secure"
+    }
+  ]
+}

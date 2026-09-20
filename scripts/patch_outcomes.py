@@ -41,6 +41,17 @@ def main() -> int:
     login = Capability.model_validate_json((ARTIFACT_DIR / "login_operator.json").read_text())
     login.business_outcomes = [OutcomePattern(text="INVALID CREDENTIALS", label="wrong username or password")]
     _save(login)
+
+    sauce = Capability.model_validate_json((ARTIFACT_DIR / "saucedemo_login.json").read_text())
+    sauce.business_outcomes = [OutcomePattern(text="Epic sadface", label="invalid credentials")]
+    _save(sauce)
+
+    net = Capability.model_validate_json((ARTIFACT_DIR / "theinternet_login.json").read_text())
+    net.business_outcomes = [
+        OutcomePattern(text="Your username is invalid", label="invalid username"),
+        OutcomePattern(text="Your password is invalid", label="invalid password"),
+    ]
+    _save(net)
     return 0
 
 

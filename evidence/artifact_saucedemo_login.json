@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "name": "saucedemo_login",
+    "version": "1.0.0",
+    "description": "Log in to the Swag Labs store. Type username standard_user and password secret_sauce into the login form, then submit it. Stop when the products page is shown.",
+    "surface": "browser",
+    "domain": "www.saucedemo.com",
+    "created_at": "2026-09-20T17:08:14.773469Z"
+  },
+  "start_url": "https://www.saucedemo.com/",
+  "inputs": [
+    {
+      "name": "user-name",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "password",
+      "type": "str",
+      "required": true,
+      "description": ""
+    }
+  ],
+  "outputs": [],
+  "checkpoint": "goal reached",
+  "checkpoint_text": "Sauce Labs Backpack",
+  "business_outcomes": [
+    {
+      "text": "Epic sadface",
+      "label": "invalid credentials"
+    }
+  ],
+  "failure_patterns": [],
+  "steps": [
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "Username",
+        "field": "user-name",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "Start by typing the username into the Username field."
+      },
+      "value": "{user-name}",
+      "assertion": {
+        "expect": "Username field contains standard_user",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "Password",
+        "field": "password",
+        "ordinal": 2,
+        "value": null,
+        "reasoning": "The username is already filled. Next, type the password into the password field."
+      },
+      "value": "{password}",
+      "assertion": {
+        "expect": "Password field contains secret_sauce",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Login",
+        "field": "login-button",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "Credentials are already entered. Click the Login button to submit."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Products page should be shown after successful login.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    }
+  ]
+}

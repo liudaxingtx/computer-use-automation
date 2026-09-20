@@ -1,0 +1,34 @@
+{
+  "capability": "theinternet_login",
+  "version": "1.0.0",
+  "inputs": {
+    "username": "enc:YBaGtxIibXtJ78rz2VqA7u5cEYMUj8kqHbSFHeIwGF8gGw16",
+    "password": "enc:x3pkMTduR5BiHcG6hBQZ6kzwzA89cYH4kI3nn6PlBnDqbMgqvw=="
+  },
+  "result": "business_outcome",
+  "outputs": {},
+  "diagnostic": "invalid password",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "ok": true,
+      "outcome": "business_outcome"
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T17:13:14.980854Z",
+  "duration_ms": 531
+}

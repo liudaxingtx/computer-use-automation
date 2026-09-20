@@ -58,14 +58,18 @@ Only two keys are required; the rest have defaults.
 
 ---
 
-## 4. What you'll see: the four pre-recorded tasks
+## 4. What you'll see: six pre-recorded tasks
 
-| Task | What it does | Inputs |
-|---|---|---|
-| `lookup_member` | Search a member by ID and read their detail | `member_id` |
-| `deactivate_member` | Search → view detail → deactivate an account | `member_id` |
-| `register_operator` | Fill the registration form and submit | `username`, `password`, `email` |
-| `login_operator` | Fill the login form and submit | `username`, `password` |
+The first four target the local mock (`localhost:9000`); the last two target **real, publicly-deployed test sites** — proving the same engine drives live sites, not just the mock.
+
+| Task | Target | What it does | Inputs |
+|---|---|---|---|
+| `lookup_member` | local mock | Search a member by ID and read their detail | `member_id` |
+| `deactivate_member` | local mock | Search → view detail → deactivate an account | `member_id` |
+| `register_operator` | local mock | Fill the registration form and submit | `username`, `password`, `email` |
+| `login_operator` | local mock | Fill the login form and submit | `username`, `password` |
+| `saucedemo_login` | saucedemo.com | Log into the Swag Labs store (real site) | `user-name`, `password` |
+| `theinternet_login` | the-internet.herokuapp.com | Log into the Secure Area (real site) | `username`, `password` |
 
 Each task card opens a detail view showing: the **replayable path** (the distilled steps with their locator strategy), the **page screenshots** its path touches, the **extracted output fields**, a **Swagger-style `POST /run`** panel to invoke it with your own inputs, and **recent run history**.
 
@@ -126,6 +130,7 @@ These are the "why" behind the "what" — the parts we considered carefully:
 - **Every step asserts.** We never assume a click worked; each step declares what it expects, and a mismatch is classified.
 - **Errors are first-class.** Three states, not two: "no such member" is a *business outcome*, not a failure. This taxonomy is proven against a deliberately hostile mock.
 - **Non-idempotent operations are recognized.** Recording `register` re-runs the same input on verify, which correctly surfaces "username taken" — a side-effect, not a bug.
+- **Async-render (SPA) waiting.** Real sites render results asynchronously after navigation (a React app may show the "old" page for ~200ms). Replay polls for the checkpoint text — or an outcome — briefly before declaring failure, so it works on live sites without slowing down the instant local mock.
 - **Data is encrypted at rest.** Customer-entered values are AES-256-GCM encrypted with a per-tenant key; locator structure stays plaintext so artifacts remain reviewable.
 
 ---
@@ -139,7 +144,7 @@ Each of these was deliberately scoped out, with a known path to add it — not b
 - **Automatic error-state discovery.** Recording only sees the happy path; `business_outcome` / `failure` signals are patched in today. A negative-testing pass could discover them automatically.
 - **Generalized output extraction.** Today extraction targets key-value tables; free-text result pages need an extra extraction strategy (CSS selector is already reserved).
 - **Multi-tenant / queue / cluster plumbing.** Deliberately omitted — the brief discourages premature infrastructure; the depth went into the artifact schema, the error taxonomy, and handoff instead.
-- **Automation against public sites.** Omitted on ToS and state-control grounds; the error taxonomy is proven on a local hostile mock.
+- **Automation against general commercial sites.** Deliberately scoped to automation-friendly test sites (SauceDemo, The Internet) — general sites sit behind ToS, CAPTCHAs and WAFs that are out of scope here. The error taxonomy is proven on the local hostile mock *and* two live sites.
 
 ---
 

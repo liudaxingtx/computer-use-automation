@@ -1,0 +1,63 @@
+{
+  "status": "success",
+  "goal_reached": true,
+  "outputs": {},
+  "checkpoint_text": "Sauce Labs Backpack",
+  "reason": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "Username",
+        "field": "user-name",
+        "ordinal": 1
+      },
+      "value": "standard_user",
+      "expect": "Username field contains standard_user",
+      "thought": "Start by typing the username into the Username field.",
+      "after_url": "https://www.saucedemo.com/"
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "Password",
+        "field": "password",
+        "ordinal": 2
+      },
+      "value": "secret_sauce",
+      "expect": "Password field contains secret_sauce",
+      "thought": "The username is already filled. Next, type the password into the password field.",
+      "after_url": "https://www.saucedemo.com/"
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Login",
+        "field": "login-button",
+        "ordinal": 1
+      },
+      "value": null,
+      "expect": "Products page should be shown after successful login.",
+      "thought": "Credentials are already entered. Click the Login button to submit.",
+      "after_url": "https://www.saucedemo.com/inventory.html"
+    },
+    {
+      "step": 4,
+      "action": "done",
+      "target": null,
+      "value": null,
+      "expect": "Products page is shown with inventory items",
+      "thought": "The login actions have already been performed according to history, and the current page is the inventory/products page showing product items such as Sauce Labs Backpack. The goal is to stop when the products page is shown, so we are done.",
+      "after_url": "https://www.saucedemo.com/inventory.html"
+    }
+  ]
+}

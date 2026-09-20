@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "name": "theinternet_login",
+    "version": "1.0.0",
+    "description": "Log in to the site. Type username tomsmith and password SuperSecretPassword! into the login form, then submit it. Stop when the secure area page is shown.",
+    "surface": "browser",
+    "domain": "the-internet.herokuapp.com",
+    "created_at": "2026-09-20T17:12:26.104333Z"
+  },
+  "start_url": "https://the-internet.herokuapp.com/login",
+  "inputs": [
+    {
+      "name": "username",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "password",
+      "type": "str",
+      "required": true,
+      "description": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "logged_in",
+      "type": "str",
+      "source": "result page",
+      "label": "logged_in",
+      "extract": ""
+    },
+    {
+      "name": "page_message",
+      "type": "str",
+      "source": "result page",
+      "label": "page_message",
+      "extract": ""
+    },
+    {
+      "name": "heading",
+      "type": "str",
+      "source": "result page",
+      "label": "heading",
+      "extract": ""
+    }
+  ],
+  "checkpoint": "goal reached",
+  "checkpoint_text": "Secure Area",
+  "business_outcomes": [
+    {
+      "text": "Your username is invalid",
+      "label": "invalid username"
+    },
+    {
+      "text": "Your password is invalid",
+      "label": "invalid password"
+    }
+  ],
+  "failure_patterns": [],
+  "steps": [
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "username",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "Type the username into the first textbox."
+      },
+      "value": "{username}",
+      "assertion": {
+        "expect": "Username textbox contains tomsmith.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "",
+        "field": "password",
+        "ordinal": 2,
+        "value": null,
+        "reasoning": "The username is already filled in. Type the password into the password textbox next."
+      },
+      "value": "{password}",
+      "assertion": {
+        "expect": "Password field contains SuperSecretPassword!",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Login",
+        "field": "",
+        "ordinal": 1,
+        "value": null,
+        "reasoning": "Fill in the login form has been done. The next step is to submit by clicking the Login button."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Secure area page is shown after successful login",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    }
+  ]
+}

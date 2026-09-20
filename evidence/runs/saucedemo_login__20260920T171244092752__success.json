@@ -1,0 +1,34 @@
+{
+  "capability": "saucedemo_login",
+  "version": "1.0.0",
+  "inputs": {
+    "user-name": "enc:YjKTqw1rijaO0NRBzVkNOzWWGtEN5jizhomwWBuj+rCWsx2gCKz/AbQ=",
+    "password": "enc:l8wTfzu90yRNacGiSmtQZDH2dOsxigNrtTMg9kriYJz/kdmVPrwTpg=="
+  },
+  "result": "success",
+  "outputs": {},
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T17:12:44.092752Z",
+  "duration_ms": 367
+}

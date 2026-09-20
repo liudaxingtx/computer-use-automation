@@ -1,0 +1,38 @@
+{
+  "capability": "theinternet_login",
+  "version": "1.0.0",
+  "inputs": {
+    "username": "enc:OtbSy7j0jZrstv/8xLD+3m7qzyEe9/K/JiiRPXOXsF59W7BK",
+    "password": "enc:fNRLGJ8KwsibddeathZq/TKfQZ8xj+YK9u3/r0d4emgkGMwsCLoDjSgL4MytSeEF"
+  },
+  "result": "success",
+  "outputs": {
+    "logged_in": null,
+    "page_message": null,
+    "heading": null
+  },
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T17:12:27.917576Z",
+  "duration_ms": 278
+}

@@ -17,6 +17,11 @@ Legend: ✅ done · 🚧 in progress · ⬜ not started
 | 2026-09-18 | Phase 5 — safety + escalation + artifact mgmt (`agent/safety.py`, `handoff.py`, `crypto.py`, `cli.py`): allowlist, AES-256-GCM encryption, handoff, CLI list/edit/bump/verify |
 | 2026-09-19 | Phase 6 — evidence & observability (`agent/observability.py`): ReplayStore (append-only runs, inputs encrypted at rest) + success telemetry + failure inbox + replay-the-error; `/evidence/` with artifact + discovery log + 3 replay runs (incl. one failure); CLI `telemetry`/`failures`/`replay-case`/`resolve`; repair loop demonstrated end-to-end |
 | 2026-09-19 | Phase 7 — REPORT.md: distilled DESIGN.md into the seven mandated headings (architecture / artifact schema / determinism+locator / heterogeneity / handoff / safety / cuts) |
+| 2026-09-19 | Dashboard (`dashboard/`): domain-grouped task console, Swagger-style `POST /run`, page screenshots + lightbox, call log, delete-with-confirm |
+| 2026-09-19 | Data extraction on replay: result page read back into structured JSON with normalized field matching (`member_id` == `MEMBER ID`) |
+| 2026-09-20 | One-click recording (`POST /api/discover`): URL + description → recorded + verified task; `start_url` on Capability + field-name param inference (username/password/email) |
+| 2026-09-20 | register/login flows on the mock, plus **two real sites** (SauceDemo, The Internet); SPA async-render checkpoint polling in replay |
+| 2026-09-20 | User-facing `GETTING_STARTED.md` + `requirements.txt` + `.env.example` |
 
 ## 🎯 Roadmap
 

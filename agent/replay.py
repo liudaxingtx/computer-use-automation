@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional, cast
 
 import re
+import time
 
 from playwright.sync_api import Page
 from pydantic import BaseModel
@@ -236,9 +237,24 @@ def replay(page: Page, cap: Capability, inputs: dict,
             return _finish(result, diagnostic=label, screenshot=shot)
 
     # All steps executed without an early outcome — check the success checkpoint.
-    text = _page_text(page)
-    if cap.checkpoint_text and cap.checkpoint_text in text:
-        return _finish("success", outputs=_extract_outputs(page, cap))
+    # Real sites (React SPAs etc.) may render the result asynchronously *after*
+    # the navigation settles, so poll briefly for the checkpoint text (or an
+    # outcome) before declaring failure. Local mocks hit on the first check, so
+    # this costs nothing for the common case.
+    deadline = time.monotonic() + 5.0
+    while True:
+        text = _page_text(page)
+        if cap.checkpoint_text and cap.checkpoint_text in text:
+            return _finish("success", outputs=_extract_outputs(page, cap))
+        outcome = _classify(page, cap)
+        if outcome:
+            result, label = outcome
+            shot = _save_screenshot(page, screenshot_dir, cap.meta.name) if result == "failure" else None
+            return _finish(result, diagnostic=label, screenshot=shot)
+        if time.monotonic() >= deadline:
+            break
+        page.wait_for_timeout(250)
+
     diag = (f"checkpoint not reached; expected page text containing "
             f"{cap.checkpoint_text!r}, got page of {len(text)} chars")
     shot = _save_screenshot(page, screenshot_dir, cap.meta.name)
