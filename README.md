@@ -33,7 +33,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
 
-# 2. Configure API keys
+# 2. Configure API keys (optional — only needed to *record new* tasks)
 cp .env.example .env      # fill in DEEPSEEK_API_KEY and KIMI_API_KEY
 
 # 3. Start the local target app (a "legacy bank" mock, port 9000)
@@ -45,7 +45,7 @@ python3 mock-app/server.py
 # 5. Open http://localhost:8123
 ```
 
-You'll see a dashboard of pre-recorded tasks grouped by target site, each invokable with your own inputs. Full walkthrough: **[`GETTING_STARTED.md`](GETTING_STARTED.md)**.
+You'll see a dashboard of pre-recorded tasks grouped by target site, each invokable with your own inputs. **Viewing and replaying the pre-recorded tasks needs no API keys** — replay is deterministic, no LLM in the loop. Keys are only required to record *new* tasks. Full walkthrough: **[`GETTING_STARTED.md`](GETTING_STARTED.md)**.
 
 ---
 
