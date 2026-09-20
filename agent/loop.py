@@ -103,6 +103,7 @@ def _act(page, decision: dict, obs: dict) -> dict:
             "name": el["name"],
             "field": el.get("field", ""),
             "ordinal": el.get("ordinal"),
+            "name_ordinal": el.get("name_ordinal"),
         }
 
     if kind == "click":
@@ -195,6 +196,18 @@ def run_discovery(page, task: str, max_steps: int = 20, verbose: bool = True,
         desc = act["desc"]
         kind = act["action"]
         history.append(f"step {step_no}: {desc}")
+
+        # Real sites re-render asynchronously (SPA client-side routing). After an
+        # action that can change the page, let it settle before the next observe()
+        # so we don't read a half-transitioned DOM (e.g. clicking "Continue" on
+        # SauceDemo updates the URL immediately but the overview renders a beat
+        # later). networkidle is the signal; a short sleep is the safety net.
+        if kind in ("click", "type", "select", "navigate"):
+            try:
+                page.wait_for_load_state("networkidle", timeout=2500)
+            except Exception:
+                pass
+            page.wait_for_timeout(300)
 
         steps.append({
             "step": step_no,

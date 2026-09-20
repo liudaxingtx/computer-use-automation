@@ -45,7 +45,12 @@
   .domain { margin-top: 22px; }
   .domain-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .domain-title .d { font-size: 13px; font-weight: 600; letter-spacing: 0.3px; color: var(--cyan); }
+  .domain-title .d .host { color: var(--dim); font-weight: 500; font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; }
   .domain-title .cnt { font-size: 11px; color: var(--dim); }
+  .domain-title .kind { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .domain-title .kind.real { color: var(--green); background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.3); }
+  .domain-title .kind.mock { color: var(--violet); background: rgba(167,139,250,0.12); border: 1px solid rgba(167,139,250,0.3); }
+  .domain-title .note { font-size: 11px; color: var(--dim); font-style: italic; }
   .domain-title::after { content: ""; height: 1px; flex: 1; background: var(--line); }
   .grid { display: grid; gap: 12px; }
 
@@ -324,13 +329,27 @@ async function loadTasks() {
     (byDomain[d] ||= []).push(t);
   }
 
+  // friendly labels + real/mock tag for known domains
+  const DOMAIN_META = {
+    'localhost:9000': { label: 'Local mock app', kind: 'mock', note: 'deliberately-hostile legacy bank back-office stand-in' },
+    'www.saucedemo.com': { label: 'SauceDemo', kind: 'real', note: 'Sauce Labs e-commerce demo — public test store' },
+    'the-internet.herokuapp.com': { label: 'The Internet', kind: 'real', note: 'classic practice site' },
+  };
+
   const domains = Object.keys(byDomain).sort();
   $('#domains').innerHTML = domains.length
-    ? domains.map(d => `
+    ? domains.map(d => {
+        const meta = DOMAIN_META[d] || { label: d, kind: null, note: '' };
+        const kindTag = meta.kind ? `<span class="kind ${meta.kind}">${meta.kind === 'real' ? 'real site' : 'mock'}</span>` : '';
+        const note = meta.note ? `<span class="note">${esc(meta.note)}</span>` : '';
+        const label = meta.label === d ? `<span class="d">${esc(d)}</span>`
+          : `<span class="d">${esc(meta.label)} <span class="host">${esc(d)}</span></span>`;
+        return `
       <div class="domain">
-        <div class="domain-title"><span class="d">${esc(d)}</span><span class="cnt">${byDomain[d].length} task(s)</span></div>
+        <div class="domain-title">${label}${kindTag}<span class="cnt">${byDomain[d].length} task(s)</span>${note}</div>
         <div class="grid">${byDomain[d].map(taskCard).join('')}</div>
-      </div>`).join('')
+      </div>`;
+      }).join('')
     : '<div class="empty">No tasks yet — record a capability first.</div>';
 
   document.querySelectorAll('.task').forEach(el => el.onclick = () => openTask(el.dataset.name));

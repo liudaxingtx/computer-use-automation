@@ -47,7 +47,12 @@ def _resolve_locator(page: Page, target: Optional[LocatorStrategy]):
     if target.strategy == "accessibility":
         role = cast(Any, target.role)
         if target.name:
-            return page.get_by_role(role, name=target.name)
+            loc = page.get_by_role(role, name=target.name)
+            # Disambiguate repeated same-name controls (e.g. six "Add to cart"
+            # buttons) with the recorded position within the matched group.
+            if target.name_ordinal is not None:
+                loc = loc.nth(target.name_ordinal - 1)
+            return loc
         if target.ordinal is not None:
             # Empty-name fallback (see DESIGN decision log): nth control of this role.
             return page.get_by_role(role).nth(target.ordinal - 1)

@@ -4,6 +4,7 @@ One thin httpx helper for both endpoints; no third-party SDK needed.
 """
 import json
 import re
+import time
 
 import httpx
 
@@ -37,18 +38,41 @@ def _parse_json(text: str) -> dict:
         raise
 
 
-def deepseek_decide(messages: list, temperature: float = 0.2, max_tokens: int = 2000) -> dict:
-    """Call DeepSeek for a structured decision. Returns a parsed JSON dict."""
-    payload = {
-        "model": config.DEEPSEEK_MODEL,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "response_format": {"type": "json_object"},
-    }
-    data = _post(config.DEEPSEEK_BASE_URL, config.DEEPSEEK_API_KEY, payload)
-    content = data["choices"][0]["message"]["content"]
-    return _parse_json(content)
+def deepseek_decide(messages: list, temperature: float = 0.2, max_tokens: int = 8192) -> dict:
+    """Call DeepSeek for a structured decision. Returns a parsed JSON dict.
+
+    deepseek-v4-pro is a *reasoning* model: it emits `reasoning_content` (the
+    monologue) plus `content` (the answer). The monologue can be long — on a
+    complex page with accumulated history it can consume the entire output
+    budget, leaving `content` empty. Two mitigations:
+      1. a generous output budget (8192) so the monologue rarely exhausts it;
+      2. when `content` is empty, fall back to parsing the JSON out of
+         `reasoning_content` (which usually still contains it).
+    Retries with a short backoff turn any residual drift into a self-heal.
+    """
+    last_err: Exception | None = None
+    for attempt in range(3):
+        payload = {
+            "model": config.DEEPSEEK_MODEL,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "response_format": {"type": "json_object"},
+        }
+        try:
+            data = _post(config.DEEPSEEK_BASE_URL, config.DEEPSEEK_API_KEY, payload)
+            msg = data["choices"][0]["message"]
+            content = msg.get("content") or ""
+            if not content.strip():
+                rc = msg.get("reasoning_content") or ""
+                if not rc.strip():
+                    raise ValueError("decision LLM returned empty content and empty reasoning")
+                content = rc
+            return _parse_json(content)
+        except Exception as e:  # noqa: BLE001 — retry any transient decode/empty failure
+            last_err = e
+            time.sleep(1.5 * (attempt + 1))
+    raise RuntimeError(f"decision LLM failed after 3 attempts: {last_err}")
 
 
 def kimi_vision(image_b64: str, prompt: str, mime: str = "image/png") -> str:

@@ -1,0 +1,88 @@
+{
+  "capability": "saucedemo_checkout",
+  "version": "1.0.0",
+  "inputs": {
+    "user-name": "enc:MqDDN9PRZdltiylsD/8qA1ygTaqrz9s+iUBKi3nCvByUVP1On8rj1hE=",
+    "password": "enc:+Ma2SxevZpFqRNesHcFJoSAn0qiXBbvFNx5ehMcUhMQ4SqM8HmiITw==",
+    "firstName": "enc:Y4Vzg5uzoxAMkzgXJ2yAnAwro3bKPDDEAXA/TaD8ACg=",
+    "lastName": "enc:zgucAA4jMIt1EPZUi2RHoht4yrmQqVKj1k/1KNeSxA==",
+    "postalCode": "enc:iZH7wRBpnujZ4NP7ZFWn3E+cZLEB3FFpbo0AshYT45Fc"
+  },
+  "result": "success",
+  "outputs": {
+    "confirmation_heading": "Thank you for your order!",
+    "checkout_banner": "Checkout: Complete!"
+  },
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 4,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 5,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 6,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 7,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 8,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 9,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 10,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 11,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T18:18:53.133719Z",
+  "duration_ms": 1107
+}

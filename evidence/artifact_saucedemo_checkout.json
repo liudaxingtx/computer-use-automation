@@ -1,0 +1,279 @@
+{
+  "meta": {
+    "name": "saucedemo_checkout",
+    "version": "1.0.0",
+    "description": "Log in as standard_user with password secret_sauce, then add the first product (Sauce Labs Backpack) to the cart, open the shopping cart, click Checkout, fill the shipping form (First Name 'John', Last Name 'Doe', Zip/Postal Code '73112'), click Continue, then Finish to reach the order-complete confirmation page.",
+    "surface": "browser",
+    "domain": "www.saucedemo.com",
+    "created_at": "2026-09-20T18:18:06.480219Z"
+  },
+  "start_url": "https://www.saucedemo.com/",
+  "inputs": [
+    {
+      "name": "user-name",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "password",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "firstName",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "lastName",
+      "type": "str",
+      "required": true,
+      "description": ""
+    },
+    {
+      "name": "postalCode",
+      "type": "str",
+      "required": true,
+      "description": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "confirmation_heading",
+      "type": "str",
+      "source": "confirmation page",
+      "label": "",
+      "extract": ".complete-header"
+    },
+    {
+      "name": "checkout_banner",
+      "type": "str",
+      "source": "confirmation page",
+      "label": "",
+      "extract": ".title"
+    }
+  ],
+  "checkpoint": "goal reached",
+  "checkpoint_text": "Thank you for your order",
+  "business_outcomes": [
+    {
+      "text": "Epic sadface",
+      "label": "invalid credentials"
+    }
+  ],
+  "failure_patterns": [],
+  "steps": [
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "Username",
+        "field": "user-name",
+        "ordinal": 1,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "Type the username into the Username field before entering the password."
+      },
+      "value": "{user-name}",
+      "assertion": {
+        "expect": "Username field shows standard_user",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "Password",
+        "field": "password",
+        "ordinal": 2,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "Username is already filled; next enter the password into the password field."
+      },
+      "value": "{password}",
+      "assertion": {
+        "expect": "The password field contains the entered password and the Login button is ready to be clicked.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Login",
+        "field": "login-button",
+        "ordinal": 1,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "Credentials are filled; click Login to authenticate."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Products page with inventory list visible",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Add to cart",
+        "field": "add-to-cart-sauce-labs-backpack",
+        "ordinal": 5,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "The first product is Sauce Labs Backpack; its Add to cart button is index 5. Click it to add to cart."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Cart badge updates to 1 and the button changes to Remove for Sauce Labs Backpack",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Cart, 1 items",
+        "field": "",
+        "ordinal": 2,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "The first product is already in the cart (cart shows 1 item, and the Backpack has a Remove button). Next step is to open the shopping cart."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Shopping cart page opens showing Sauce Labs Backpack in the cart.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Checkout",
+        "field": "checkout",
+        "ordinal": 6,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "The cart page shows the Sauce Labs Backpack and a Checkout button. The next step is to click Checkout to proceed to the shipping form."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Checkout: Your Information form should be displayed with First Name, Last Name, and Zip/Postal Code fields.",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "First Name",
+        "field": "firstName",
+        "ordinal": 1,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "Fill in the shipping form. Start by typing the first name into the First Name field."
+      },
+      "value": "{firstName}",
+      "assertion": {
+        "expect": "First Name field contains 'John'",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "Last Name",
+        "field": "lastName",
+        "ordinal": 2,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "We are on checkout step one; first name already filled. Next fill Last Name field."
+      },
+      "value": "{lastName}",
+      "assertion": {
+        "expect": "Last Name textbox contains 'Doe'",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "type",
+      "target": {
+        "strategy": "accessibility",
+        "role": "textbox",
+        "name": "Zip/Postal Code",
+        "field": "postalCode",
+        "ordinal": 3,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "The first and last name are already filled. The next required step is to enter the Zip/Postal Code before clicking Continue."
+      },
+      "value": "{postalCode}",
+      "assertion": {
+        "expect": "Zip/Postal Code field contains '73112'",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Continue",
+        "field": "continue",
+        "ordinal": 4,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "Shipping form is filled. Click Continue to proceed to order overview."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Order overview page with Finish button visible",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    },
+    {
+      "action": "click",
+      "target": {
+        "strategy": "accessibility",
+        "role": "button",
+        "name": "Finish",
+        "field": "finish",
+        "ordinal": 5,
+        "name_ordinal": 1,
+        "value": null,
+        "reasoning": "On the checkout overview page, click Finish to place the order and reach the confirmation page."
+      },
+      "value": null,
+      "assertion": {
+        "expect": "Order complete confirmation page with thank you message and order details",
+        "on_mismatch": "fail"
+      },
+      "on_error": null
+    }
+  ]
+}

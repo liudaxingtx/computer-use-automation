@@ -50,6 +50,7 @@ def _field_name(el) -> str:
 def collect_interactive(page: Page) -> list[dict]:
     """Enumerate every visible interactive element with a stable role+name locator."""
     items = []
+    name_seen: dict[tuple[str, str], int] = {}
     for role in INTERACTIVE_ROLES:
         loc = page.get_by_role(cast(Any, role))
         n = loc.count()
@@ -63,11 +64,18 @@ def collect_interactive(page: Page) -> list[dict]:
             # `ordinal` = this element's 1-based position *within its role*, so
             # replay can fall back to `get_by_role(role).nth(ordinal-1)` when the
             # accessible name is empty (see DESIGN decision log — empty-name fallback).
+            # `name_ordinal` = 1-based position *within role+name* — disambiguates
+            # repeated same-name controls (e.g. six "Add to cart" buttons on a
+            # real storefront), which `ordinal` cannot do.
+            name = _element_name(el)
+            key = (role, name)
+            name_seen[key] = name_seen.get(key, 0) + 1
             items.append({
                 "role": role,
-                "name": _element_name(el),
+                "name": name,
                 "field": _field_name(el),
                 "ordinal": i + 1,
+                "name_ordinal": name_seen[key],
                 "locator": el,
             })
     for idx, it in enumerate(items, start=1):

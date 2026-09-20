@@ -28,6 +28,8 @@ class LocatorStrategy(BaseModel):
     name: Optional[str] = None          # accessibility strategy
     field: Optional[str] = None         # HTML name attribute — labels the replay input param
     ordinal: Optional[int] = None       # 1-based position within the role; fallback when name is empty
+    name_ordinal: Optional[int] = None  # 1-based position within role+name matches — disambiguates
+                                        # repeated same-name controls (e.g. six "Add to cart" buttons)
     value: Optional[str] = None         # css/xpath expression, or text for 'text' strategy
     reasoning: str = ""                 # why this locator was chosen — for review + repair
 
@@ -133,6 +135,7 @@ def serialize(
                 name=t.get("name"),
                 field=t.get("field"),
                 ordinal=t.get("ordinal"),
+                name_ordinal=t.get("name_ordinal"),
                 reasoning=s.get("thought", ""),
             )
 

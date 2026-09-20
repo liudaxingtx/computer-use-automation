@@ -1,0 +1,37 @@
+{
+  "capability": "saucedemo_checkout",
+  "version": "1.0.0",
+  "inputs": {
+    "user-name": "enc:Dhj+6XJQQB5KKnR8C76gjxxXjFkQf1pQZaWFuSVduYb/NnLOnfvCh8E=",
+    "password": "enc:pbw2WI8jZabCcrWfKUXCFioJJj4GlsjDcwIwXDAXXFQBozS56NUAZzOY",
+    "firstName": "enc:kQ1smHImeRCc1Dptt72Ok8Xs15+vFmWxAK6WKaWUV0k=",
+    "lastName": "enc:EJjB/Zv4LC8BEEAZDVY04cfiFFusqaK7zOrU2FUQdw==",
+    "postalCode": "enc:5J81N4dK3JOAtUq+LrTRPK2r/suc1t/1Cj51cZXPhXWE"
+  },
+  "result": "business_outcome",
+  "outputs": {},
+  "diagnostic": "invalid credentials",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 3,
+      "action": "click",
+      "ok": true,
+      "outcome": "business_outcome"
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-20T18:25:06.475606Z",
+  "duration_ms": 320
+}

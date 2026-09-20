@@ -57,6 +57,23 @@ SHOT_MAP = {
         ("login_success", "Result — login success"),
         ("login_invalid", "Result — invalid credentials"),
     ],
+    "saucedemo_login": [
+        ("sauce_login_form", "Login page"),
+        ("sauce_login_success", "Result — products (logged in)"),
+        ("sauce_login_invalid", "Result — invalid credentials"),
+    ],
+    "saucedemo_checkout": [
+        ("sauce_checkout_products", "Products — add to cart"),
+        ("sauce_checkout_cart", "Shopping cart"),
+        ("sauce_checkout_form", "Checkout — shipping form"),
+        ("sauce_checkout_overview", "Checkout — order overview"),
+        ("sauce_checkout_complete", "Result — order complete"),
+    ],
+    "theinternet_login": [
+        ("inet_login_form", "Login page"),
+        ("inet_login_success", "Result — secure area"),
+        ("inet_login_invalid", "Result — invalid credentials"),
+    ],
 }
 
 
