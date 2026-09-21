@@ -80,25 +80,17 @@ SHOT_MAP = {
 
 def _load_capability(name: str):
     from agent.artifact import Capability
-    # Prefer the runtime artifact store (artifacts/); fall back to the committed
-    # evidence seed (evidence/artifact_<name>.json) so a fresh clone — where
-    # artifacts/ is git-ignored and absent — still shows every pre-recorded task.
-    p = ARTIFACT_DIR / f"{name}.json"
-    if not p.exists():
-        p = EVIDENCE_DIR / f"artifact_{name}.json"
-    return Capability.model_validate_json(p.read_text())
+    # The artifact is the recorded solution path. artifacts/ is version-controlled,
+    # so there is no fallback — it is the single source of truth.
+    return Capability.model_validate_json((ARTIFACT_DIR / f"{name}.json").read_text())
 
 
 def _capabilities() -> list[dict]:
-    # Union of the runtime store (takes precedence) and the committed evidence
-    # seed, so the dashboard is complete both in a working tree and after a
-    # fresh clone.
+    # List the version-controlled solution paths (artifacts/). No evidence-seed
+    # fallback — artifacts/ is committed.
     names: set[str] = set()
     if ARTIFACT_DIR.exists():
         names.update(f.stem for f in ARTIFACT_DIR.glob("*.json"))
-    if EVIDENCE_DIR.exists():
-        for f in EVIDENCE_DIR.glob("artifact_*.json"):
-            names.add(f.stem[len("artifact_"):])
     out = []
     for name in sorted(names):
         try:
@@ -324,15 +316,14 @@ def _stats_json() -> dict:
 
 
 def _delete_task(name: str) -> dict:
-    """Delete a recorded task and everything tied to it: the artifact, its
-    evidence copies, the discovery log, and every recorded run (call history).
+    """Delete a recorded task and everything tied to it: the artifact, the
+    discovery transcript, and every recorded run (call history).
     Returns what was removed so the UI can confirm the result."""
     if not (ARTIFACT_DIR / f"{name}.json").exists():
         return {"ok": False, "error": f"task '{name}' not found"}
 
     removed = []
     for p in (ARTIFACT_DIR / f"{name}.json",
-              EVIDENCE_DIR / f"artifact_{name}.json",
               EVIDENCE_DIR / f"discovery_{name}.json"):
         if p.exists():
             p.unlink()
@@ -405,11 +396,10 @@ def _discover_task(url: str, task: str, name: str = "") -> dict:
             "steps": len(cap.steps),
         }
 
-    # persist artifact + evidence
+    # persist the artifact (solution path) + the raw discovery transcript
     ARTIFACT_DIR.mkdir(exist_ok=True)
     EVIDENCE_DIR.mkdir(exist_ok=True)
     (ARTIFACT_DIR / f"{name}.json").write_text(cap.model_dump_json(indent=2))
-    (EVIDENCE_DIR / f"artifact_{name}.json").write_text(cap.model_dump_json(indent=2))
     (EVIDENCE_DIR / f"discovery_{name}.json").write_text(
         json.dumps(discovery, indent=2, default=str)
     )

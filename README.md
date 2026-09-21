@@ -93,13 +93,36 @@ agent/        the engine — discovery loop, artifact model, deterministic repla
 dashboard/    both web interfaces — server.py, index.html (admin), user.html (runner),
               screenshots/
 mock-app/     a deliberately-hostile local stand-in for a legacy bank back-office app
-evidence/     committed deliverables — capabilities, raw discovery transcripts,
-              append-only run logs (inputs encrypted at rest)
+artifacts/    the recorded solution paths — one Capability JSON per task (version-controlled)
+evidence/     raw discovery transcripts + append-only run logs (inputs encrypted at rest)
 scripts/      one-command tests, screenshot/evidence generators, artifact helpers
-artifacts/    runtime capability store (git-ignored working directory)
 ```
 
-### 2.3 The data flow
+### 2.3 The demo target — a "legacy bank" mock
+
+The local target (`mock-app/`, port 9000) is a deliberately-hostile stand-in for the kind of legacy back-office software interface.ai's agents must drive. It is styled like a 1998-era banking portal — dated DOM, terse labels, no modern JS — because that is the hardest, most representative surface.
+
+<p>
+  <img src="dashboard/screenshots/search.png" width="190" alt="Member lookup — entry form">
+  <img src="dashboard/screenshots/detail.png" width="190" alt="Member detail — FIELD/VALUE table">
+  <img src="dashboard/screenshots/no_such_member.png" width="190" alt="No such member — business outcome">
+  <img src="dashboard/screenshots/access_denied.png" width="190" alt="Access denied — failure">
+</p>
+
+Left to right: the **member lookup** entry form (one `MEMBER ID` input + `SEARCH`), the **member detail** page (a FIELD/VALUE table the replay extracts outputs from), a **business_outcome** ("no such member" — a valid answer, not a crash), and a **failure** (deactivating a restricted account).
+
+The mock is **multi-modal** — the same endpoint returns a different outcome per input, so a single recorded flow exercises all three result states:
+
+| `member_id` | Result |
+|---|---|
+| `1001` | JOHN SMITH · ACTIVE · $4,250.00 |
+| `1002` | JANE DOE · RESTRICTED · $12.80 (deactivate → access denied) |
+| `1003` | ROBERT CHEN · ACTIVE · $18,900 |
+| `9999` | no such member |
+
+There are also register/login flows (username/password, with taken/invalid states) — all visible in the admin console's task list.
+
+### 2.4 The data flow
 
 1. **Discover** — the decision LLM is shown a live browser (URL + accessibility tree + a numbered control menu) and decides one action at a time. Image-only surfaces fall back to a vision model.
 2. **Record** — the successful transcript is distilled into a `Capability`: typed steps, locator *strategies* (role+name, never pixels), per-step assertions, first-class error states.

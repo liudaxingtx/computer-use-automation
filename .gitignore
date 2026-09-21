@@ -16,10 +16,8 @@ test-results/
 # Confidential interview assignment — do not commit
 assignmentAComputerUseSystem.pdf
 
-# Runtime artifact store (the CLI's working directory)
-artifacts/
-
-# Evidence is deliberately committed (it's a deliverable) — do not ignore.
+# The recorded solution paths (artifacts/) are version-controlled — a deliverable.
+# Evidence is deliberately committed (raw discovery transcripts + run logs) — do not ignore.
 
 # IDE
 .idea/
