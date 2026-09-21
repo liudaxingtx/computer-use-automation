@@ -1,6 +1,6 @@
 # REPORT — Computer-Use Automation System
 
-> Final submission write-up for the interface.ai take-home. The implementation is complete and backed by real runs under `/evidence/` and `/artifacts/`.
+> Final submission write-up for the interface.ai take-home. This is the primary design document — the implementation is complete and backed by real runs under `/evidence/` and `/artifacts/`.
 
 ## 1. Architecture
 
@@ -25,11 +25,17 @@ The system is a single process with clean module boundaries, in three blocks tha
    └──────────────┘                            └─────────────────┘
 ```
 
+The data flow is **discover → record → replay**:
+
+1. **Discover** — the decision LLM is shown a live browser (URL + accessibility tree + a numbered control menu) and decides one action at a time. Image-only surfaces fall back to a vision model.
+2. **Record** — the successful transcript is distilled into a `Capability`: typed steps, locator *strategies* (role+name, never pixels), per-step assertions, first-class error states.
+3. **Replay** — a deterministic engine re-runs the artifact: it re-resolves each locator against the live page, acts, then classifies the result into one of **three states**.
+
 Key decisions and trade-offs:
 
 - **Observation uses three eyes, each with one job.** The **accessibility tree** is primary (text, cheap, and more stable than raw DOM on legacy apps); a **vision model** is the fallback for non-semantic surfaces; **screenshots** are captured only as evidence on failure. Trade-off: we bias toward the accessibility tree even though screenshot+coordinates would look more "general", because the tree survives branding/version drift that raw pixels don't.
 - **The artifact is decoupled from the transcript.** The raw LLM monologue is thrown away; what persists is a distilled, typed description a human can review and diff.
-- **Single process, sync driver.** Simplicity over service sprawl — the brief explicitly discourages premature infrastructure (§7 Cuts). The seams (a `target.strategy` enum, a driver behind `replay`) are where a future service/queue boundary would go.
+- **Single process, sync driver.** Simplicity over service sprawl — the brief explicitly discourages premature infrastructure (§7). The seams (a `target.strategy` enum, a driver behind `replay`) are where a future service/queue boundary would go.
 
 ## 2. Artifact schema
 
@@ -69,7 +75,15 @@ Robustness comes from four concrete mechanisms:
 - **Async-render (SPA) waiting.** Real sites render results *after* navigation settles. Replay polls for the checkpoint (or an outcome) for a bounded window before declaring failure — this is the difference the mock alone couldn't expose, and it is what made the SauceDemo checkout replay reliable.
 - **Reasoning-model output drift.** Reasoning LLMs can spend their whole budget on a monologue and return empty `content`; a generous budget, a `reasoning_content` fallback, and a retry make the discovery loop self-heal.
 
-Secondary (UI drift) is handled by re-resolving locators at replay time and asserting after every step; the artifact-edit CLI is the repair surface when a target genuinely changes.
+### Observability & the statistics report
+
+Every invocation is **recorded, measured, and re-runnable**:
+
+- **Append-only run store.** Each replay is one JSON file under `evidence/runs/`, keyed by task + timestamp + result — nothing is ever overwritten.
+- **Real-time rates.** Telemetry aggregates, per task + version: `success`, `business_outcome`, `failure` counts and their **rates** (`success_rate`, `business_rate`, **`failure_rate`**) — if a task starts erroring, the error rate is visible immediately.
+- **Failure inbox.** Every non-success run lands in an unresolved-failures inbox; a maintainer marks them resolved after a fix.
+- **Replay-the-error loop.** Any failure can be re-run deterministically with its exact original inputs to reproduce and verify a fix.
+- **Statistics report (admin console).** A live report that aggregates, per task, the counts **and rates** (with a rate bar), then lists every invocation: successes show timestamp + duration + extracted numbers, failures show the **encrypted** input (`enc:…`, never decrypted in the report) + diagnostic. Every row has a **↻ Replay** button that re-runs that exact invocation with its original inputs.
 
 ## 4. Heterogeneity & multi-tenant
 
@@ -77,7 +91,14 @@ The schema is **surface-agnostic**: `action` is a small typed vocabulary (`click
 
 Because we record **intent + locator strategy** (not coordinates), an artifact recorded on one tenant's instance of a vendor product applies to a second, differently-branded instance, with per-variant overrides where a route or label differs. This falls out of the schema for free. Per-tenant/version drift is the one place that genuinely needs the human repair loop: telemetry surfaces which (capability, version) pairs are failing, and the `edit`/`bump`/`verify` CLI is the fix path.
 
-**Known boundary with a known fix — relative/coordinate clicking.** Some legacy surfaces are canvas- or image-only: no DOM, no accessibility tree, nothing to locate by role+name. We reserve a `visual` locator strategy in the schema and the vision fallback already *describes* such screens (including a suggested click point), but there is no `click_at` action yet. The concrete plan: record the click point as an offset from a detected landmark (never raw pixels), re-locate the landmark with the vision model at replay time, then `page.mouse.click(x, y)`. It re-introduces a vision call into the replay path for those rare steps, which is why it's reserved, opt-in, and kept out of the common path rather than shipped speculatively.
+**Known boundary with a known fix — relative/coordinate clicking (the big one).** Some legacy surfaces are canvas- or image-only: no DOM, no accessibility tree, nothing to locate by role+name. Today the vision fallback *describes* such screens (including a recommended click point), but there is no "click at coordinates" action, so we can't actually drive them. The concrete plan:
+
+1. The `visual` locator strategy is **already reserved** in the schema — extend the action vocabulary with a coordinate click (`click_at`).
+2. **Record relative, not absolute.** During discovery, store the click point as an offset from a detected *landmark* (e.g. "the CONTINUE button center, relative to the page's bounding box") — never raw pixels, which break on any viewport/resolution change.
+3. **Re-locate at replay time.** Re-run the vision model on the current screenshot to re-find the landmark and re-compute the click point, then `page.mouse.click(x, y)` — robust to resize, scroll, and different screens.
+4. **Guard it.** Coordinate clicking is inherently less reliable than semantic locators, so it's an explicit, flagged per-step fallback that re-asserts after the click and escalates to a human on mismatch.
+
+The honest tradeoff: this re-introduces a vision model into the replay path for *those specific steps* (bending the "no LLM in replay" invariant), which is why it's opt-in and kept out of the common path — and why we reserved it but haven't built it yet: the target back-office apps are DOM-based, so it's a rare fallback whose full cost (relative anchoring + re-location) didn't pay off for the mock/sauce-demo targets.
 
 ## 5. Escalation & handoff
 
@@ -93,15 +114,36 @@ The system detects a blocked state, raises an intervention request (capability, 
 
 ## 6. Safety
 
-Three layers. **Allowlist:** permitted domains/routes and action types, enforced in the agent loop *and* re-checked in replay — the agent cannot act outside it. **Action gating:** risky/irreversible actions (submit, delete, approve) are classified and blocked or routed to escalation. **Data handling:** customer-entered values are AES-256-GCM encrypted with a per-tenant key before writing to an artifact or run log, decrypted only at the moment of use; extracted outputs are returned to the caller, never persisted. Keys come from the environment, never from git.
+Three layers.
 
-The limits are honest: the allowlist is explicit but finite (the threat model is accidental mis-action, not a determined adversary), and the statistics report deliberately shows a failed run's input as ciphertext (`enc:…`) — an operator can replay it, but never read a customer's raw value from the report.
+**Allowlist:** permitted domains/routes and action types, enforced in the agent loop *and* re-checked in replay — the agent cannot act outside it.
+
+**Action gating:** risky/irreversible actions (submit, delete, approve) are classified and blocked or routed to escalation.
+
+**Data handling:** customer-entered values are treated as secrets end to end —
+
+- **AES-256-GCM encryption at rest.** Every input value is encrypted *before* it touches disk; the run log and artifacts never store plaintext customer data.
+- **Decrypt only at the moment of use.** Replay decrypts an input solely to type it into the target form, then it is gone.
+- **Per-tenant keys.** The master key derives a separate key per tenant (`SHA-256(master ‖ tenant)`), so one tenant's data is unreadable with another's key.
+- **Authenticated encryption.** Wrong key or tampering raises — ciphertext can't silently decrypt to garbage.
+- **Key never committed.** The master key lives in the environment (or a KMS in production), never in the repo.
+- **Structure vs. data.** The locator strategy (UI structure) stays plaintext so artifacts remain reviewable; only the customer *data* is ciphertext.
+- **The report never reveals decrypted failure inputs.** A failed run appears in the admin report as ciphertext (`enc:…`); replaying it decrypts server-side only at the moment of use, so even an operator reading the report never sees the customer's raw value.
+
+The limits are honest: the allowlist is explicit but finite (the threat model is accidental mis-action, not a determined adversary).
 
 ## 7. Cuts
 
-Depth over breadth, deliberately. **No queues, clusters, or multi-tenant plumbing** (the brief discourages premature infrastructure); **no coordinate/visual clicking** (see §4 — a documented boundary with a known fix, not a shipped capability); **no general commercial sites** (we prove the error taxonomy against a deliberately-hostile local mock *and* two automation-friendly public test sites — SauceDemo and The Internet — rather than targets that sit behind ToS/CAPTCHA/WAF). Each cut trades feature breadth for real depth on the load-bearing pieces — artifact schema, deterministic replay with an error taxonomy, and human handoff — plus a working observability/repair loop.
+Depth over breadth, deliberately. **No queues, clusters, or multi-tenant plumbing** (the brief discourages premature infrastructure); **no coordinate/visual clicking** (see §4 — a documented boundary with a known fix, not a shipped capability); **no general commercial sites** (we prove the error taxonomy against a deliberately-hostile local mock *and* two automation-friendly public test sites — SauceDemo and The Internet — rather than targets that sit behind ToS/CAPTCHA/WAF).
 
-Next with more time: canonicalization (`/item/12345` → `/item/:id`) to collapse parameter variants, cross-tenant override demonstration, and the coordinate-click fallback from §4.
+Other scoped-out items, each with a known path:
+
+- **Capability deduplication** — collapse "same flow, different parameter" into one task via a flow fingerprint.
+- **Automatic error-state discovery** — a negative-testing pass to discover `business_outcome`/`failure` signals automatically (today they're patched in).
+- **Generalized output extraction** — extend extraction beyond key-value tables to free-text result pages.
+- **Multi-tenant / queue / cluster plumbing** — deliberately omitted; the depth went into the artifact schema, the error taxonomy, and handoff.
+
+Next with more time: canonicalization (`/item/12345` → `/item/:id`) to collapse parameter variants, a cross-tenant override demonstration, and the coordinate-click fallback from §4.
 
 ---
 
@@ -119,4 +161,15 @@ Next with more time: canonicalization (`/item/12345` → `/item/:id`) to collaps
 
 **2. Inspect the evidence.** `/evidence/` holds a saved example artifact, raw discovery transcripts, and append-only replay run logs (inputs encrypted at rest) covering all three result states; `/artifacts/` holds the full capability catalog (version-controlled).
 
-**3. Statistics report.** Open `http://localhost:8123/` → **Statistics**: per-task success/business/failure rates, a run ledger (successes show timing + extracted numbers, failures show the *encrypted* input), and one-click **Replay** of any recorded invocation.
+**3. The demo target — a "legacy bank" mock.** The local target (`mock-app/`, port 9000) is a deliberately-hostile stand-in for legacy back-office software: 1998-era banking portal, dated DOM, terse labels, no modern JS. It is **multi-modal** — the same endpoint returns a different outcome per input, so a single recorded flow exercises all three result states:
+
+| `member_id` | Result |
+|---|---|
+| `1001` | JOHN SMITH · ACTIVE · $4,250.00 |
+| `1002` | JANE DOE · RESTRICTED · $12.80 (deactivate → access denied) |
+| `1003` | ROBERT CHEN · ACTIVE · $18,900 |
+| `9999` | no such member |
+
+**4. Statistics report.** Open `http://localhost:8123/` → **Statistics**: per-task success/business/failure rates, a run ledger (successes show timing + extracted numbers, failures show the *encrypted* input), and one-click **Replay** of any recorded invocation.
+
+**5. Implemented stretch goal.** The **agent-facing capability interface** (§8 of the brief) is implemented: the admin console (`/`) exposes saved artifacts as a catalog of callable capabilities, the engine exposes them over `POST /api/run` with typed args, and the user runner (`/user`) demonstrates one being invoked end to end.
