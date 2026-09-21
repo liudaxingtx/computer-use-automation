@@ -106,7 +106,10 @@ class ReplayStore:
         out = []
         for s in stats.values():
             s = dict(s)
-            s["success_rate"] = round(s["success"] / s["total"], 3)
+            # "succeeded" = any call that returned JSON (success + business_outcome);
+            # only failure (mid-run error-out) counts against the success rate.
+            s["succeeded"] = s["success"] + s["business_outcome"]
+            s["success_rate"] = round(s["succeeded"] / s["total"], 3)
             s["business_rate"] = round(s["business_outcome"] / s["total"], 3)
             s["failure_rate"] = round(s["failure"] / s["total"], 3)
             out.append(s)

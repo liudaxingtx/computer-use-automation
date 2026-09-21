@@ -36,6 +36,7 @@ Key decisions and trade-offs:
 - **Observation uses three eyes, each with one job.** The **accessibility tree** is primary (text, cheap, and more stable than raw DOM on legacy apps); a **vision model** is the fallback for non-semantic surfaces; **screenshots** are captured only as evidence on failure. Trade-off: we bias toward the accessibility tree even though screenshot+coordinates would look more "general", because the tree survives branding/version drift that raw pixels don't.
 - **The artifact is decoupled from the transcript.** The raw LLM monologue is thrown away; what persists is a distilled, typed description a human can review and diff.
 - **Single process, sync driver.** Simplicity over service sprawl — the brief explicitly discourages premature infrastructure (§7). The seams (a `target.strategy` enum, a driver behind `replay`) are where a future service/queue boundary would go.
+- **Single process, but a concurrent control plane.** The engine itself stays a single sync process, but the dashboard that fronts it is a `ThreadingHTTPServer`: background jobs (AI optimize) run in worker threads behind a lock-guarded registry, so a long-running optimize never blocks live `/user` calls. Concurrency is in-process and bounded — still no queues or external services.
 
 ## 2. Artifact schema
 
@@ -68,6 +69,8 @@ Replay is **act → assert → branch**, never blind re-execution. It re-resolve
 
 The result contract has exactly three states: **success** (goal reached, typed outputs extracted), **business_outcome** (a legitimate expected answer like "no such member" — *not* a crash), and **failure** (a hard stop with a debuggable diagnostic: which step, expected vs observed). This is the load-bearing distinction the brief calls out, and it is proven, not asserted — `/evidence/runs/` carries real runs for all three states.
 
+From the **caller's** point of view the contract collapses to a binary: **a call succeeded if it returned a usable JSON result.** Both `success` and `business_outcome` return structured JSON — success → the extracted fields, business_outcome → an explicit `{"outcome": "member not found"}` object — so both count as a *successful call*. Only `failure` — a mid-run error-out that returns no JSON — is a real failure. Telemetry mirrors this: `succeeded = success + business_outcome`, and the headline rate is `succeeded / total`, not `success / total`.
+
 Robustness comes from four concrete mechanisms:
 
 - **Locator strategy is an enum.** Accessibility (role+name) is primary; `name_ordinal` disambiguates repeated same-name controls (a real storefront has six identical "Add to cart" buttons); `ordinal` falls back for empty-name controls; text/css/xpath are the last resort. The strategy is chosen *at record time* with reasoning captured on the target.
@@ -80,10 +83,21 @@ Robustness comes from four concrete mechanisms:
 Every invocation is **recorded, measured, and re-runnable**:
 
 - **Append-only run store.** Each replay is one JSON file under `evidence/runs/`, keyed by task + timestamp + result — nothing is ever overwritten.
-- **Real-time rates.** Telemetry aggregates, per task + version: `success`, `business_outcome`, `failure` counts and their **rates** (`success_rate`, `business_rate`, **`failure_rate`**) — if a task starts erroring, the error rate is visible immediately.
+- **Real-time rates.** Telemetry aggregates, per task + version: `success`, `business_outcome`, `failure` counts, plus a headline **`succeeded`** (= success + business_outcome — every call that returned JSON) and its rate. `failure_rate` counts only hard error-outs, which is what an operator actually watches.
 - **Failure inbox.** Every non-success run lands in an unresolved-failures inbox; a maintainer marks them resolved after a fix.
 - **Replay-the-error loop.** Any failure can be re-run deterministically with its exact original inputs to reproduce and verify a fix.
-- **Statistics report (admin console).** A live report that aggregates, per task, the counts **and rates** (with a rate bar), then lists every *user* invocation (admin Execute/Replay ops are excluded): successes show only timestamp + duration (their data isn't stored — we don't care about them), failures show the **encrypted** input (`enc:…`, never decrypted in the report) + diagnostic and a **↻ Replay** button to re-run the exact failing invocation.
+- **Statistics report (admin console).** A live report that aggregates, per task, the counts **and rates** (with a rate bar), then lists every *user* invocation (admin Execute/Replay ops are excluded). The headline is **succeeded vs failed**: succeeded calls (success *and* business_outcome — both returned JSON) show only timestamp + duration (their data isn't stored); failures — the only true errors, where the run errored out before returning JSON — show the **encrypted** input (`enc:…`, never decrypted in the report) + diagnostic and a **↻ Replay** button to re-run the exact failing invocation.
+
+### Continuous optimization — a conversational repair loop
+
+Artifacts are not frozen after recording: a maintainer tunes them **in plain English, not by hand-editing JSON.** Every task in the admin console exposes an **AI optimize** box — describe the fix ("the `status` output is always null — read the `h2` heading and `#flash` message instead") and the decision LLM returns a **structured patch** (outputs / checkpoint / business_outcomes / failure_patterns), pydantic-validated and persisted. List fields are **full replacement**: the LLM returns the complete final list, so an item can be added or removed in one step (the merge logic initially only *upserted*, which silently made "remove this output" a no-op — caught and fixed during testing).
+
+Optimize is a **long-hold background job**:
+
+- **Runs to completion server-side.** It executes in a background worker thread decoupled from the HTTP request — a maintainer can close the tab or navigate away and the LLM keeps working.
+- **Never blocks live traffic.** Because the dashboard is a `ThreadingHTTPServer`, a slow optimize cannot stall concurrent `/user` calls; the job registry is lock-guarded.
+- **Completion is surfaced to the page.** The console polls the registry and, when a job lands, shows a toast and refreshes the task view if the maintainer is still looking at it — no manual refresh.
+- **It already paid for itself.** This is exactly how the `deactivate_member` hallucinated `status` output (a discovery-time LLM invention that always extracted `null`) was removed — one sentence, one validated patch, verified empty outputs afterward.
 
 ## 4. Heterogeneity & multi-tenant
 
@@ -170,6 +184,8 @@ Next with more time: canonicalization (`/item/12345` → `/item/:id`) to collaps
 | `1003` | ROBERT CHEN · ACTIVE · $18,900 |
 | `9999` | no such member |
 
-**4. Statistics report.** Open `http://localhost:8123/` → **Statistics**: per-task success/business/failure rates over *user* calls (admin ops excluded), and a run ledger — successes show only timing, failures show the *encrypted* input + a one-click **Replay**.
+**4. Statistics report.** Open `http://localhost:8123/` → **Statistics**: per-task **succeeded** (success + business_outcome — every call that returned JSON) vs **failed** (error-outs) rates over *user* calls (admin ops excluded), and a run ledger — succeeded calls show only timing, failures show the *encrypted* input + a one-click **Replay**. The **AI optimize** box on any task tunes its artifact conversationally as a background job.
 
 **5. Implemented stretch goal.** The **agent-facing capability interface** (§8 of the brief) is implemented: the admin console (`/`) exposes saved artifacts as a catalog of callable capabilities, the engine exposes them over `POST /api/run` with typed args, and the user runner (`/user`) demonstrates one being invoked end to end.
+
+**6. Implemented stretch goal — continuous optimization.** The interface is closed into a loop: a maintainer describes a fix in plain English and the LLM returns a validated structured patch as a **long-hold background job**, surfaced back to the page on completion — discover → replay → observe → repair, without hand-editing JSON. It runs on the concurrent (`ThreadingHTTPServer`) dashboard, so a slow optimize never blocks live calls.

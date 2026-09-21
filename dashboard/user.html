@@ -217,15 +217,20 @@ async function runTask() {
   const box = $('#result');
   if (r.error) { box.className = 'result failure'; box.innerHTML = `<div class="rlabel">Error</div><div class="rdiag">${esc(r.error)}</div>`; return; }
   box.className = 'result ' + r.result;
-  const outputsHtml = (r.outputs && Object.keys(r.outputs).length)
-    ? `<div class="outputs"><div class="olabel">Result data</div><pre>${esc(JSON.stringify(r.outputs, null, 2))}</pre></div>` : '';
+  // Always render the structured result JSON — the screenshot is evidence, not
+  // the answer. Downstream callers need result / outputs / diagnostic as data.
+  const resultJson = {
+    result: r.result,
+    diagnostic: r.diagnostic || null,
+    outputs: r.outputs || {},
+    duration_ms: r.duration_ms != null ? r.duration_ms : null,
+  };
   box.innerHTML = `
     <div class="rhead">
       <span class="rlabel">${RESULT[r.result] || r.result}</span>
       <span class="rtime">${r.duration_ms != null ? r.duration_ms + ' ms' : ''}</span>
     </div>
-    ${r.diagnostic ? `<div class="rdiag">${esc(r.diagnostic)}</div>` : ''}
-    ${outputsHtml}
+    <div class="outputs"><div class="olabel">Result JSON</div><pre>${esc(JSON.stringify(resultJson, null, 2))}</pre></div>
     ${r.screenshot ? `<img src="${esc(r.screenshot)}" onerror="this.style.display='none'">` : ''}`;
 }
 

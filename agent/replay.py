@@ -240,7 +240,9 @@ def replay(page: Page, cap: Capability, inputs: dict,
         if outcome:
             result, label = outcome
             shot = _save_screenshot(page, screenshot_dir, cap.meta.name) if result == "failure" else None
-            return _finish(result, diagnostic=label, screenshot=shot)
+            extra = ({"outcome": label} if result == "business_outcome"
+                     else {"error": label} if result == "failure" else None)
+            return _finish(result, diagnostic=label, outputs=extra, screenshot=shot)
 
     # All steps executed without an early outcome — check the success checkpoint.
     # Real sites (React SPAs etc.) may render the result asynchronously *after*
@@ -256,7 +258,9 @@ def replay(page: Page, cap: Capability, inputs: dict,
         if outcome:
             result, label = outcome
             shot = _save_screenshot(page, screenshot_dir, cap.meta.name) if result == "failure" else None
-            return _finish(result, diagnostic=label, screenshot=shot)
+            extra = ({"outcome": label} if result == "business_outcome"
+                     else {"error": label} if result == "failure" else None)
+            return _finish(result, diagnostic=label, outputs=extra, screenshot=shot)
         if time.monotonic() >= deadline:
             break
         page.wait_for_timeout(250)

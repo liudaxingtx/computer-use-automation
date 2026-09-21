@@ -14,12 +14,14 @@ Run from the repo root:  .venv/bin/python -m dashboard.server
 """
 import json
 import re
+import secrets
 import sys
+import threading
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Literal
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -301,10 +303,16 @@ def _stats_json() -> dict:
     def _rate(n):
         return round(n / total, 3) if total else 0.0
 
+    # A call "succeeded" if it returned a usable JSON result — either a clean
+    # success or a business_outcome (e.g. wrong password -> explicit JSON). Only a
+    # hard failure (mid-run error out, no JSON returned) counts as failure.
+    n_succeeded = n_success + n_business
+
     tasks = []
     for name in sorted(by_task):
         s = dict(by_task[name])
-        s["success_rate"] = round(s["success"] / s["total"], 3)
+        s["succeeded"] = s["success"] + s["business_outcome"]
+        s["success_rate"] = round(s["succeeded"] / s["total"], 3)
         s["business_rate"] = round(s["business_outcome"] / s["total"], 3)
         s["failure_rate"] = round(s["failure"] / s["total"], 3)
         tasks.append(s)
@@ -314,7 +322,8 @@ def _stats_json() -> dict:
         "success": n_success,
         "business_outcome": n_business,
         "failure": n_failure,
-        "success_rate": _rate(n_success),
+        "succeeded": n_succeeded,
+        "success_rate": _rate(n_succeeded),
         "business_rate": _rate(n_business),
         "failure_rate": _rate(n_failure),
         "by_task": tasks,
@@ -357,6 +366,10 @@ def _optimize_task(name: str, instruction: str) -> dict:
         '  "failure_patterns": [{"text": str, "label": str}]\n'
         "}\n\n"
         "Rules:\n"
+        "- outputs / business_outcomes / failure_patterns are FULL replacement lists: "
+        "return the COMPLETE final list you want, not just the changes. To add an item, "
+        "include it alongside the existing ones; to remove an item, omit it. Include every "
+        "item you want to keep.\n"
         "- outputs[].extract must be a real CSS selector (e.g. \"h2\", \"#flash\", \".title\") "
         "whenever the value is read from a specific element; leave it \"\" only for key-value "
         "table extraction where label matches the on-page field.\n"
@@ -381,19 +394,9 @@ def _optimize_task(name: str, instruction: str) -> dict:
     patch = {k: v for k, v in result.items()
              if k != "explanation" and v is not None and v != ""}
 
-    # List fields merge by key (name / text), not replace — the LLM often
-    # returns only the *new* item, and we must not drop the existing ones.
-    _merge_key = {"outputs": "name", "business_outcomes": "text",
-                  "failure_patterns": "text"}
-    for field, key in _merge_key.items():
-        if field not in patch:
-            continue
-        existing = {getattr(e, key): e.model_dump() for e in getattr(cap, field)}
-        for item in patch[field]:
-            if isinstance(item, dict) and item.get(key):
-                existing[item[key]] = item
-        patch[field] = list(existing.values())
-
+    # List fields (outputs / business_outcomes / failure_patterns) are a FULL
+    # replacement: the prompt asks the LLM for the complete final list, so apply
+    # it verbatim. Pydantic validation below rejects any malformed item.
     if not patch:
         return {"ok": True, "name": name, "explanation": explanation,
                 "changed": [], "note": "no fields changed"}
@@ -415,6 +418,76 @@ def _optimize_task(name: str, instruction: str) -> dict:
         "outputs": [o.model_dump() for o in new_cap.outputs],
         "checkpoint_text": new_cap.checkpoint_text,
     }
+
+
+# --- AI optimize as a long-running background job ----------------------------
+# Optimize jobs run in a background thread so a maintainer can close the tab
+# (or navigate away) and the LLM still finishes; the admin console polls the
+# registry and is notified when a job lands. The registry is guarded by a lock
+# because ThreadingHTTPServer serves concurrent requests.
+_OPT_JOBS: dict[str, dict] = {}
+_OPT_LOCK = threading.Lock()
+_MAX_JOBS = 50
+
+
+def _optimize_async(name: str, instruction: str) -> dict:
+    """Submit an optimize as a long-running job. Returns immediately with a job
+    id; a worker thread persists the outcome for later polling."""
+    job_id = f"opt_{int(time.time() * 1000)}_{secrets.token_hex(3)}"
+    with _OPT_LOCK:
+        _OPT_JOBS[job_id] = {
+            "job_id": job_id,
+            "name": name,
+            "instruction": instruction,
+            "status": "running",
+            "started_at": time.time(),
+            "finished_at": None,
+            "result": None,
+            "error": None,
+        }
+    threading.Thread(target=_optimize_worker, args=(job_id, name, instruction),
+                     daemon=True).start()
+    return {"ok": True, "job_id": job_id, "name": name, "status": "running"}
+
+
+def _optimize_worker(job_id: str, name: str, instruction: str) -> None:
+    """Background worker: run the (slow) LLM optimize and record the outcome.
+    Runs to completion even if the submitting browser tab is closed."""
+    try:
+        result = _optimize_task(name, instruction)
+        with _OPT_LOCK:
+            _OPT_JOBS[job_id]["status"] = "done"
+            _OPT_JOBS[job_id]["result"] = result
+            _OPT_JOBS[job_id]["finished_at"] = time.time()
+    except Exception as e:  # noqa: BLE001 — surface worker failure to the poller
+        with _OPT_LOCK:
+            _OPT_JOBS[job_id]["status"] = "error"
+            _OPT_JOBS[job_id]["error"] = str(e)
+            _OPT_JOBS[job_id]["finished_at"] = time.time()
+
+
+def _optimize_status(job_id: str) -> dict:
+    with _OPT_LOCK:
+        job = _OPT_JOBS.get(job_id)
+        if not job:
+            return {"ok": False, "error": f"optimize job '{job_id}' not found"}
+        return dict(job)
+
+
+def _optimize_jobs() -> dict:
+    """All known optimize jobs (newest first) for the admin's global indicator.
+    Prune old finished jobs so the in-memory registry never grows unbounded."""
+    with _OPT_LOCK:
+        if len(_OPT_JOBS) > _MAX_JOBS:
+            finished = sorted(
+                (j for j in _OPT_JOBS.values() if j["status"] in ("done", "error")),
+                key=lambda j: j["finished_at"] or 0,
+            )
+            for j in finished[: len(_OPT_JOBS) - _MAX_JOBS]:
+                _OPT_JOBS.pop(j["job_id"], None)
+        jobs = list(_OPT_JOBS.values())
+    jobs.sort(key=lambda j: j["started_at"], reverse=True)
+    return {"jobs": jobs}
 
 
 def _delete_task(name: str) -> dict:
@@ -577,6 +650,11 @@ class Handler(BaseHTTPRequestHandler):
             self._json(_runs_json())
         elif path == "/api/stats":
             self._json(_stats_json())
+        elif path == "/api/optimize/jobs":
+            self._json(_optimize_jobs())
+        elif path == "/api/optimize/status":
+            job_id = (parse_qs(urlparse(self.path).query).get("job_id") or [""])[0]
+            self._json(_optimize_status(job_id))
         elif path.startswith("/api/task/"):
             name = unquote(path[len("/api/task/"):])
             try:
@@ -619,7 +697,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not name or not instruction:
                     self._json({"error": "task and instruction required"}, 400)
                     return
-                self._json(_optimize_task(name, instruction))
+                self._json(_optimize_async(name, instruction))
             elif path == "/api/discover":
                 self._json(_discover_task(
                     data.get("url", ""), data.get("task", ""), data.get("name", "")
@@ -646,7 +724,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     print(f"task dashboard on http://localhost:{PORT}  (LAN: http://<this-mac-ip>:{PORT})")
-    HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 
 if __name__ == "__main__":

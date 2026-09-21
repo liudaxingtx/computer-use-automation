@@ -36,25 +36,34 @@ with tempfile.TemporaryDirectory() as td:
                                     diagnostic="step 3 failed: ACCESS DENIED"))
 
     # 2. plaintext inputs must not leak to disk (encrypted at rest, DESIGN §9).
-    raw = (Path(td) / "runs" / f"{id_ok}.json").read_text()
-    assert "1001" not in raw, "plaintext input leaked to disk"
-    print("1. record: inputs encrypted at rest on disk")
+    #    Successful runs store NO inputs at all (zero-retention); failures keep
+    #    them encrypted — so the leak check targets the failure run.
+    raw_fail = (Path(td) / "runs" / f"{id_fail}.json").read_text()
+    assert "1002" not in raw_fail, "plaintext input leaked to disk"
+    raw_ok = (Path(td) / "runs" / f"{id_ok}.json").read_text()
+    assert "1001" not in raw_ok, "successful run stored inputs (should be zero-retention)"
+    print("1. record: inputs encrypted at rest; successful runs store no inputs")
 
-    # 3. load round-trips and decrypts inputs.
-    loaded = store.load(id_ok)
-    assert loaded.inputs == {"member_id": "1001"}
-    assert loaded.result == "success"
+    # 3. load round-trips and decrypts inputs; successful runs are zero-retention.
+    loaded_fail = store.load(id_fail)
+    assert loaded_fail.inputs == {"member_id": "1002"}
+    assert loaded_fail.result == "failure"
+    loaded_ok = store.load(id_ok)
+    assert loaded_ok.inputs == {}, "successful run should retain no inputs"
+    assert loaded_ok.result == "success"
     print("2. load: round-trips + decrypts inputs")
 
-    # 4. telemetry aggregates all three states.
+    # 4. telemetry aggregates all three states; succeeded = success + business_outcome.
     stats = store.telemetry()
     assert len(stats) == 1, "one capability should yield one telemetry row"
     s = stats[0]
     assert s["success"] == 1 and s["business_outcome"] == 1 and s["failure"] == 1
     assert s["total"] == 3
-    assert abs(s["success_rate"] - 1 / 3) < 0.001
+    assert s["succeeded"] == 2
+    assert abs(s["success_rate"] - 2 / 3) < 0.001
     print(f"3. telemetry: success={s['success']} business={s['business_outcome']} "
-          f"failure={s['failure']} success_rate={s['success_rate']}")
+          f"failure={s['failure']} succeeded={s['succeeded']} "
+          f"success_rate={s['success_rate']}")
 
     # 5. failure inbox surfaces only the failure.
     fails = store.failures()

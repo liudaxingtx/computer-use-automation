@@ -41,6 +41,9 @@
   .chip .n { color: var(--txt); font-weight: 700; }
   .chip.verified { color: var(--green); border-color: rgba(52,211,153,0.35); }
   .chip.verified .n { color: var(--green); }
+  .chip.job { color: var(--violet); border-color: rgba(167,139,250,0.35); }
+  .chip.job .n { color: var(--violet); animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
   .domain { margin-top: 22px; }
   .domain-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -263,6 +266,7 @@
       <span class="chip">Tasks <span class="n" id="sTotal">–</span></span>
       <span class="chip verified">Verified <span class="n" id="sVerified">–</span></span>
       <span class="chip">Unverified <span class="n" id="sUnverified">–</span></span>
+      <span class="chip job" id="jobChip" style="display:none">⚙ <span class="n" id="jobCount">0</span> optimizing</span>
     </div>
     <button class="register" onclick="openDiscover()">+ Register task</button>
     <button class="calllog" onclick="openStats()">Statistics</button>
@@ -341,6 +345,8 @@ function normalizeInput(s) {
 }
 
 const RESULT = { success: 'Success', business_outcome: 'Business outcome', failure: 'Failure' };
+let currentTaskName = null;            // task whose detail modal is currently open
+const JOBS = { notified: new Set() };  // optimize job ids we've already surfaced
 
 function fmtRunStats(r) {
   if (!r) return '';
@@ -409,6 +415,7 @@ async function openTask(name) {
   const res = await fetch('/api/task/' + encodeURIComponent(name));
   const t = await res.json();
   if (t.error) { toast(t.error); return; }
+  currentTaskName = name;
   renderModal(t);
   $('#overlay').classList.add('open');
 }
@@ -638,8 +645,8 @@ async function openStats() {
 function renderStats(d) {
   const head = `<div class="clog-head">
     <span class="clog-stat">Total <b>${d.total ?? 0}</b> calls</span>
-    <span class="clog-stat"><span class="ok"><b>${d.success ?? 0}</b> success · ${pct(d.success_rate)}</span></span>
-    <span class="clog-stat"><span class="bo"><b>${d.business_outcome ?? 0}</b> business · ${pct(d.business_rate)}</span></span>
+    <span class="clog-stat"><span class="ok"><b>${d.succeeded ?? 0}</b> succeeded · ${pct(d.success_rate)}</span></span>
+    <span class="clog-stat" style="opacity:.65"><span class="bo">${d.success ?? 0} clean · ${d.business_outcome ?? 0} business</span></span>
     <span class="clog-stat"><span class="fl"><b>${d.failure ?? 0}</b> failed · ${pct(d.failure_rate)}</span></span>
   </div>`;
 
@@ -654,8 +661,8 @@ function renderStats(d) {
         <span class="st-count">${t.total} call${t.total === 1 ? '' : 's'}</span>
       </div>
       <div class="st-metrics">
-        <span class="st-ok">${t.success}✓ success</span>
-        <span class="st-bo">${t.business_outcome}● business</span>
+        <span class="st-ok"><b>${t.succeeded}</b>✓ succeeded</span>
+        <span class="st-bo" style="opacity:.75">${t.success} clean · ${t.business_outcome} business</span>
         <span class="st-fl">${t.failure}✗ failed · ${pct(t.failure_rate)}</span>
         <div class="rbar"><div class="rbar-fill" style="width:${okPct}%"></div></div>
         <span class="rbar-pct">${okPct}% ok</span>
@@ -718,22 +725,71 @@ async function optimizeTask(name) {
   const instruction = $('#optInstruction').value.trim();
   if (!instruction) { toast('Describe the change first'); return; }
   const btn = document.querySelector('.opt-btn');
+  const box = $('#optResult');
   btn.disabled = true; btn.textContent = 'Optimizing…';
+  box.className = 'result'; box.style.display = 'block';
+  box.innerHTML = '<div class="rdiag">Optimizing in the background — you can close this page; the AI keeps working and you will be notified when it finishes.</div>';
   try {
     const res = await fetch('/api/optimize', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ task: name, instruction })
     });
     const r = await res.json();
-    btn.disabled = false; btn.textContent = '✨ Optimize';
-    if (r.error) { toast('Error: ' + r.error); return; }
-    const changed = (r.changed && r.changed.length) ? r.changed.join(', ') : 'nothing';
-    toast(`Optimized ${r.name}: ${changed}${r.explanation ? ' — ' + r.explanation : ''}`);
-    openTask(name);  // refresh so the new outputs/checkpoint show
+    if (r.error) {
+      btn.disabled = false; btn.textContent = '✨ Optimize';
+      box.className = 'result failure';
+      box.innerHTML = `<div class="rlabel">Error</div><div class="rdiag">${esc(r.error)}</div>`;
+      return;
+    }
+    $('#optInstruction').value = '';
+    refreshJobs();  // register the new job; the global poller reports completion
   } catch (e) {
     btn.disabled = false; btn.textContent = '✨ Optimize';
+    box.className = 'result'; box.style.display = 'none';
     toast('Error: ' + String(e));
   }
+}
+
+// Poll optimize jobs and surface completion — even if the detail modal is closed
+// or the admin navigated away, the "long hold" optimize still reports back.
+async function refreshJobs() {
+  try {
+    const res = await fetch('/api/optimize/jobs');
+    const data = await res.json();
+    const jobs = data.jobs || [];
+    const running = jobs.filter(j => j.status === 'running');
+    const chip = $('#jobChip');
+    if (running.length) {
+      chip.style.display = '';
+      $('#jobCount').textContent = running.length;
+    } else {
+      chip.style.display = 'none';
+    }
+    for (const j of jobs) {
+      if (j.status === 'running' || JOBS.notified.has(j.job_id)) continue;
+      JOBS.notified.add(j.job_id);
+      const modalOpen = $('#overlay').classList.contains('open');
+      if (j.status === 'done') {
+        const r = j.result || {};
+        const changed = (r.changed && r.changed.length) ? r.changed.join(', ') : 'nothing';
+        toast(`✨ ${j.name} optimized: ${changed}`);
+        if (modalOpen && currentTaskName === j.name) {
+          const btn = document.querySelector('.opt-btn');
+          if (btn) { btn.disabled = false; btn.textContent = '✨ Optimize'; }
+          openTask(j.name);  // refresh so the updated outputs/checkpoint show
+        }
+      } else if (j.status === 'error') {
+        toast(`Optimize failed for ${j.name}: ${j.error || ''}`);
+        if (modalOpen && currentTaskName === j.name) {
+          const btn = document.querySelector('.opt-btn');
+          if (btn) { btn.disabled = false; btn.textContent = '✨ Optimize'; }
+          const box = $('#optResult');
+          box.className = 'result failure';
+          box.innerHTML = `<div class="rlabel">Failed</div><div class="rdiag">${esc(j.error || '')}</div>`;
+        }
+      }
+    }
+  } catch (e) { /* transient network error — the next tick retries */ }
 }
 
 let pendingDelete = null;
@@ -785,6 +841,8 @@ document.addEventListener('click', e => {
 $('#lightbox').addEventListener('click', () => $('#lightbox').classList.remove('open'));
 
 loadTasks();
+setInterval(refreshJobs, 3000);
+refreshJobs();
 </script>
 </body>
 </html>

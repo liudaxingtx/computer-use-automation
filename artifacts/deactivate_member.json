@@ -16,15 +16,7 @@
       "description": "Member account ID to deactivate — e.g. 1001"
     }
   ],
-  "outputs": [
-    {
-      "name": "status",
-      "type": "str",
-      "source": "result page",
-      "label": "",
-      "extract": ""
-    }
-  ],
+  "outputs": [],
   "checkpoint": "result page shows SUCCESS",
   "checkpoint_text": "SUCCESS",
   "business_outcomes": [
