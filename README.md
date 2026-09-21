@@ -47,7 +47,7 @@ Then open:
 
 | URL | Who it's for | What it does |
 |---|---|---|
-| `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, statistics report (per-task user-call rates + replay failed calls), delete, register new tasks |
+| `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, statistics report (per-task user-call rates + replay failed calls in a full result modal), AI-optimize any task conversationally, delete, register new tasks |
 | `http://localhost:8123/user` | **User runner** | Pick a task from a dropdown → fill its inputs → run → see the result |
 
 ### 1.5 Demo path — discover a goal, then replay it
@@ -111,4 +111,4 @@ scripts/      one-command tests, screenshot/evidence generators, artifact helper
 
 ## 3. Design
 
-The full design argument — architecture, artifact schema, determinism & error handling, heterogeneity & multi-tenant, escalation & handoff, safety, and cuts — is in **[`REPORT.md`](REPORT.md)**. It also documents the demo target (the "legacy bank" mock and its multi-modal inputs), the statistics report, and the implemented stretch goal (agent-facing capability interface).
+The full design argument — architecture, artifact schema, determinism & error handling, heterogeneity & multi-tenant, escalation & handoff, safety, and cuts — is in **[`REPORT.md`](REPORT.md)**. It also documents the demo target (the "legacy bank" mock and its multi-modal inputs), the statistics report, the AI-optimize conversational repair loop, and the implemented stretch goal (agent-facing capability interface).

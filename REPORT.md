@@ -69,6 +69,8 @@ Replay is **act → assert → branch**, never blind re-execution. It re-resolve
 
 The result contract has exactly three states: **success** (goal reached, typed outputs extracted), **business_outcome** (a legitimate expected answer like "no such member" — *not* a crash), and **failure** (a hard stop with a debuggable diagnostic: which step, expected vs observed). This is the load-bearing distinction the brief calls out, and it is proven, not asserted — `/evidence/runs/` carries real runs for all three states.
 
+The boundary is drawn deliberately: **a page-returned "error message" is a business_outcome, not a failure.** `ACCESS DENIED`, `INVALID PASSWORD`, "wrong password" — these are the target app *correctly reporting a business rule*, and the task did its job (it reached the page and read the answer back). Only a **mid-run error-out** — a locator that can't be resolved, a step that throws, a success checkpoint that never appears — is a `failure`, because that's the one case where no JSON answer was produced.
+
 From the **caller's** point of view the contract collapses to a binary: **a call succeeded if it returned a usable JSON result.** Both `success` and `business_outcome` return structured JSON — success → the extracted fields, business_outcome → an explicit `{"outcome": "member not found"}` object — so both count as a *successful call*. Only `failure` — a mid-run error-out that returns no JSON — is a real failure. Telemetry mirrors this: `succeeded = success + business_outcome`, and the headline rate is `succeeded / total`, not `success / total`.
 
 Robustness comes from four concrete mechanisms:
@@ -85,12 +87,12 @@ Every invocation is **recorded, measured, and re-runnable**:
 - **Append-only run store.** Each replay is one JSON file under `evidence/runs/`, keyed by task + timestamp + result — nothing is ever overwritten.
 - **Real-time rates.** Telemetry aggregates, per task + version: `success`, `business_outcome`, `failure` counts, plus a headline **`succeeded`** (= success + business_outcome — every call that returned JSON) and its rate. `failure_rate` counts only hard error-outs, which is what an operator actually watches.
 - **Failure inbox.** Every non-success run lands in an unresolved-failures inbox; a maintainer marks them resolved after a fix.
-- **Replay-the-error loop.** Any failure can be re-run deterministically with its exact original inputs to reproduce and verify a fix.
+- **Replay-the-error loop.** Any failure can be re-run deterministically with its exact original inputs. The admin console's **↻ Replay** opens a full result modal — result pill, diagnostic, extracted JSON, a per-step execution log (green/amber/red, so the exact failing step is visible), and the failure screenshot — with an inline **AI optimize** box, so the maintainer can describe the fix against *that specific case* without leaving the replay view.
 - **Statistics report (admin console).** A live report that aggregates, per task, the counts **and rates** (with a rate bar), then lists every *user* invocation (admin Execute/Replay ops are excluded). The headline is **succeeded vs failed**: succeeded calls (success *and* business_outcome — both returned JSON) show only timestamp + duration (their data isn't stored); failures — the only true errors, where the run errored out before returning JSON — show the **encrypted** input (`enc:…`, never decrypted in the report) + diagnostic and a **↻ Replay** button to re-run the exact failing invocation.
 
 ### Continuous optimization — a conversational repair loop
 
-Artifacts are not frozen after recording: a maintainer tunes them **in plain English, not by hand-editing JSON.** Every task in the admin console exposes an **AI optimize** box — describe the fix ("the `status` output is always null — read the `h2` heading and `#flash` message instead") and the decision LLM returns a **structured patch** (outputs / checkpoint / business_outcomes / failure_patterns), pydantic-validated and persisted. List fields are **full replacement**: the LLM returns the complete final list, so an item can be added or removed in one step (the merge logic initially only *upserted*, which silently made "remove this output" a no-op — caught and fixed during testing).
+Artifacts are not frozen after recording: a maintainer tunes them **in plain English, not by hand-editing JSON.** Every task in the admin console exposes an **AI optimize** box (two entry points: the task detail, and the replay-result modal for fixing a specific failing case) — describe the fix ("the `status` output is always null — read the `h2` heading and `#flash` message instead") and the decision LLM returns a **structured patch** (outputs / checkpoint / business_outcomes / failure_patterns), pydantic-validated and persisted. List fields are **full replacement**: the LLM returns the complete final list, so an item can be added or removed in one step (the merge logic initially only *upserted*, which silently made "remove this output" a no-op — caught and fixed during testing).
 
 Optimize is a **long-hold background job**:
 
@@ -98,6 +100,7 @@ Optimize is a **long-hold background job**:
 - **Never blocks live traffic.** Because the dashboard is a `ThreadingHTTPServer`, a slow optimize cannot stall concurrent `/user` calls; the job registry is lock-guarded.
 - **Completion is surfaced to the page.** The console polls the registry and, when a job lands, shows a toast and refreshes the task view if the maintainer is still looking at it — no manual refresh.
 - **It already paid for itself.** This is exactly how the `deactivate_member` hallucinated `status` output (a discovery-time LLM invention that always extracted `null`) was removed — one sentence, one validated patch, verified empty outputs afterward.
+- **And it exposed a taxonomy bug.** `deactivate_member`'s "permission denied" failures were a *classification* error, not a system error: `ACCESS DENIED` (a restricted member can't be deactivated) had been recorded as a `failure_pattern` instead of a `business_outcome`, so a correctly-behaving task looked broken. Moving it (and `register_operator`'s `INVALID PASSWORD` / `INVALID INPUT`) to `business_outcomes` drove the recorded failure rate to zero.
 
 ## 4. Heterogeneity & multi-tenant
 
@@ -184,7 +187,7 @@ Next with more time: canonicalization (`/item/12345` → `/item/:id`) to collaps
 | `1003` | ROBERT CHEN · ACTIVE · $18,900 |
 | `9999` | no such member |
 
-**4. Statistics report.** Open `http://localhost:8123/` → **Statistics**: per-task **succeeded** (success + business_outcome — every call that returned JSON) vs **failed** (error-outs) rates over *user* calls (admin ops excluded), and a run ledger — succeeded calls show only timing, failures show the *encrypted* input + a one-click **Replay**. The **AI optimize** box on any task tunes its artifact conversationally as a background job.
+**4. Statistics report.** Open `http://localhost:8123/` → **Statistics**: per-task **succeeded** (success + business_outcome — every call that returned JSON) vs **failed** (error-outs) rates over *user* calls (admin ops excluded), and a run ledger — succeeded calls show only timing, failures show the *encrypted* input + a one-click **Replay**. **Replay** opens a full result modal (result + extracted JSON + per-step log + screenshot) with an inline **AI optimize** box, so a failing case can be fixed conversationally — optimize runs as a background job.
 
 **5. Implemented stretch goal.** The **agent-facing capability interface** (§8 of the brief) is implemented: the admin console (`/`) exposes saved artifacts as a catalog of callable capabilities, the engine exposes them over `POST /api/run` with typed args, and the user runner (`/user`) demonstrates one being invoked end to end.
 
