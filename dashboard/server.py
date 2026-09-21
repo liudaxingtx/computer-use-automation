@@ -189,10 +189,11 @@ def _task_detail(cap) -> dict:
 
 
 def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
-                    source: Literal["user", "admin"] = "user") -> dict:
+                    source: Literal["user", "admin"] = "user",
+                    expect: dict | None = None) -> dict:
     from playwright.sync_api import sync_playwright
 
-    from agent.replay import replay
+    from agent.replay import assert_outputs, replay
 
     shot = f"run_{name}.png"
     with sync_playwright() as p:
@@ -203,6 +204,21 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
         page.screenshot(path=str(SHOTS / shot))
         browser.close()
     run.source = source
+    run.expect = expect or None
+
+    # Output assertion: when an `expect` is supplied, a returned JSON that
+    # doesn't satisfy it is a HARD FAILURE — not a success. A JSON that looks
+    # fine but fails the assertion means the task itself is broken (wrong
+    # extractor, wrong success signal, wrong business outcome), so we override
+    # whatever the checkpoint/outcome classifier decided.
+    expect_ok = None
+    if expect:
+        ok, reason = assert_outputs(run.outputs, expect)
+        expect_ok = ok
+        if not ok:
+            run.result = "failure"
+            run.diagnostic = f"expect assertion failed: {reason}"
+
     # Persist every invocation so the statistics report can answer "how many
     # times was this task really used, and what happened".
     ReplayStore().record(run)
@@ -211,6 +227,8 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
         "result": run.result,
         "diagnostic": run.diagnostic,
         "outputs": run.outputs,
+        "expect": run.expect,
+        "expect_ok": expect_ok,
         "screenshot": f"/api/screenshots/{shot}?t={int(time.time() * 1000)}",
         "steps": run.steps,
         "inputs": inputs if echo_inputs else None,
@@ -218,9 +236,10 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
     }
 
 
-def _run_task(name: str, inputs: dict, source: Literal["user", "admin"] = "user") -> dict:
+def _run_task(name: str, inputs: dict, source: Literal["user", "admin"] = "user",
+              expect: dict | None = None) -> dict:
     cap = _load_capability(name)
-    return _execute_replay(cap, inputs, name, source=source)
+    return _execute_replay(cap, inputs, name, source=source, expect=expect)
 
 
 def _rerun_task(run_id: str) -> dict:
@@ -233,7 +252,7 @@ def _rerun_task(run_id: str) -> dict:
     run = store.load(run_id, decrypt=True)
     cap = _load_capability(run.capability)
     result = _execute_replay(cap, run.inputs, run.capability,
-                             echo_inputs=False, source="admin")
+                             echo_inputs=False, source="admin", expect=run.expect)
     result["rerun_of"] = run_id
 
     # A successful re-run of a previously-failed invocation proves the fix:
@@ -834,12 +853,13 @@ class Handler(BaseHTTPRequestHandler):
                 name = data.get("task")
                 inputs = data.get("inputs") or {}
                 source = data.get("source", "user")
+                expect = data.get("expect") or None
                 if source not in ("user", "admin"):
                     source = "user"
                 if not name:
                     self._json({"error": "task required"}, 400)
                     return
-                self._json(_run_task(name, inputs, source=source))
+                self._json(_run_task(name, inputs, source=source, expect=expect))
             elif path == "/api/rerun":
                 run_id = data.get("run_id")
                 if not run_id:

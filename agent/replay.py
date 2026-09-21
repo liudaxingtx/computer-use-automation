@@ -38,6 +38,44 @@ class ReplayRun(BaseModel):
     source: Literal["user", "admin"] = "user"   # user call vs admin op (Execute/Replay)
     resolved_result: Optional[str] = None       # a failed run later fixed: the new result
     resolved_at: Optional[datetime] = None      # when a successful re-run verified the fix
+    expect: Optional[dict] = None               # output assertion carried by this invocation
+
+
+def _value_matches(actual, expected) -> bool:
+    """Loose equality for assertion values: numeric strings match numbers
+    (1001 == "1001"), bools match "true"/"false", otherwise string equality."""
+    if actual is None or expected is None:
+        return actual is None and expected is None
+    if isinstance(expected, bool):
+        if isinstance(actual, bool):
+            return actual == expected
+        return str(actual).strip().lower() == str(expected).lower()
+    if isinstance(expected, (int, float)):
+        try:
+            return float(actual) == float(expected)
+        except (ValueError, TypeError):
+            return False
+    return str(actual).strip() == str(expected).strip()
+
+
+def assert_outputs(outputs: dict, expect: dict) -> tuple[bool, str]:
+    """Assert that a returned JSON object matches an expected shape.
+
+    Every expect key must be present in `outputs` with a matching value.
+    Returns (ok, reason). An empty/None expect trivially passes. This is a
+    hard gate: a JSON that doesn't satisfy the assertion means the task is
+    broken, so a mismatch is reclassified as failure by the caller.
+    """
+    problems = []
+    for k, expected in (expect or {}).items():
+        if k not in outputs:
+            problems.append(f"{k}: missing")
+            continue
+        if not _value_matches(outputs[k], expected):
+            problems.append(f"{k}: got {outputs[k]!r}, want {expected!r}")
+    if problems:
+        return False, "; ".join(problems)
+    return True, ""
 
 
 def _resolve_locator(page: Page, target: Optional[LocatorStrategy]):
@@ -90,13 +128,16 @@ def _page_text(page: Page) -> str:
         return ""
 
 
-def _classify(page: Page, cap: Capability) -> Optional[tuple[Result, str]]:
+def _classify(page: Page, cap: Capability, text: Optional[str] = None) -> Optional[tuple[Result, str]]:
     """Match the current page against the capability's outcome patterns.
 
     Returns (result, label) or None. Failure takes precedence over business
-    outcomes; both take precedence over continuing to the next step.
+    outcomes; both take precedence over continuing to the next step. Accepts a
+    pre-fetched `text` so callers doing a checkpoint check in the same iteration
+    don't pay for a second full-page inner_text() read.
     """
-    text = _page_text(page)
+    if text is None:
+        text = _page_text(page)
     for p in cap.failure_patterns:
         if p.text in text:
             return ("failure", p.label or p.text)
@@ -256,7 +297,8 @@ def replay(page: Page, cap: Capability, inputs: dict,
         text = _page_text(page)
         if cap.checkpoint_text and cap.checkpoint_text in text:
             return _finish("success", outputs=_extract_outputs(page, cap))
-        outcome = _classify(page, cap)
+        # Reuse the text we just fetched — avoids a second full-page read.
+        outcome = _classify(page, cap, text=text)
         if outcome:
             result, label = outcome
             shot = _save_screenshot(page, screenshot_dir, cap.meta.name) if result == "failure" else None

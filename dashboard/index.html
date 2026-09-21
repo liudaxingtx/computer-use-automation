@@ -789,7 +789,7 @@ async function runTest(name) {
   btn.disabled = true; btn.textContent = 'Executing…';
   const res = await fetch('/api/run', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task: name, inputs, source: 'admin' })
+    body: JSON.stringify({ task: name, inputs, source: 'admin', expect })
   });
   const r = await res.json();
   btn.disabled = false; btn.textContent = '▶ Execute';
@@ -798,9 +798,11 @@ async function runTest(name) {
   box.className = 'result ' + r.result;
   const outputsHtml = (r.outputs && Object.keys(r.outputs).length)
     ? `<div class="outputs"><div class="olabel">Extracted data</div><pre>${esc(JSON.stringify(r.outputs, null, 2))}</pre></div>` : '';
-  // Output assertion: if the filled example declares an `expect`, the returned
-  // JSON must match it — otherwise the run is flagged as failing the check.
-  const expectHtml = expect ? renderExpectCheck(r.outputs, expect) : '';
+  // Output assertion is now enforced server-side: a mismatch reclassifies the
+  // run as failure. Show the verdict from the backend (r.expect_ok), not a
+  // client-side recompute.
+  const expectHtml = (r.expect && Object.keys(r.expect).length)
+    ? renderExpectCheck(r.expect, r.expect_ok) : '';
   box.innerHTML = `
     <div class="rhead">
       <span class="rlabel">${RESULT[r.result] || r.result}</span>
@@ -814,17 +816,13 @@ async function runTest(name) {
   loadTasks();
 }
 
-function renderExpectCheck(outputs, expect) {
-  const problems = [];
-  for (const [k, v] of Object.entries(expect)) {
-    const got = (outputs || {})[k];
-    if (got === undefined) problems.push(`${k}: missing`);
-    else if (String(got) !== String(v)) problems.push(`${k}: got "${got}", want "${v}"`);
+function renderExpectCheck(expect, ok) {
+  // Verdict comes from the backend: ok=true means the returned JSON matched the
+  // assertion; ok=false means it didn't (and the run was already marked failure).
+  if (ok) {
+    return `<div class="rdiag" style="color:var(--green);border:1px solid rgba(52,211,153,0.35);border-radius:8px;padding:8px 10px">✓ expect matched: ${esc(JSON.stringify(expect))}</div>`;
   }
-  if (problems.length) {
-    return `<div class="rdiag" style="color:var(--red);border:1px solid rgba(248,113,113,0.35);border-radius:8px;padding:8px 10px">✗ expect failed: ${esc(problems.join('; '))}</div>`;
-  }
-  return `<div class="rdiag" style="color:var(--green);border:1px solid rgba(52,211,153,0.35);border-radius:8px;padding:8px 10px">✓ expect matched: ${esc(JSON.stringify(expect))}</div>`;
+  return `<div class="rdiag" style="color:var(--red);border:1px solid rgba(248,113,113,0.35);border-radius:8px;padding:8px 10px">✗ expect failed: ${esc(JSON.stringify(expect))} — run marked failure</div>`;
 }
 
 function openDiscover() {

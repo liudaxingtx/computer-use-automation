@@ -65,7 +65,17 @@ Six principles govern it:
 
 The schema is the contract the calling agent sees, not just a step list: typed inputs it supplies, typed outputs it gets back, and a checkpoint that defines success.
 
+The **output side is shaped as deliberately as the input side**: every task declares a **standardized output contract** — the exact JSON it returns in each case, so a caller can branch on the shape without inspecting a page. Discovery and AI optimize design this contract, not just the inputs:
+
+- **success** → a typed object of extracted fields, one key per declared `outputs` entry, e.g. `{"name": "JOHN SMITH", "status": "ACTIVE", "balance": "$4,250.00"}`.
+- **business_outcome** → an explicit `{"outcome": "<label>"}` object, e.g. `{"outcome": "member not found"}` — so even a legitimate "no" answer is a well-formed, machine-readable result.
+- **failure** → no JSON — the run errored out mid-flow and only the diagnostic is inspectable.
+
+The admin console renders this contract as a **"Standardized output"** panel in every task's detail view, listing each result state → its JSON shape, so a maintainer sees at a glance exactly what a caller will receive.
+
 Each capability also carries **runnable `examples`** — concrete input values mapped to their expected result (success / business_outcome / failure) with a note on what the tester should see. The admin console renders these as an **outcome / input / note table positioned directly above the Execute button**, and every row has a one-click **fill** button that loads that exact input into the form — so a tester verifies a case by clicking fill then Execute, no typing and no knowledge of the target system's internals required. Examples are **live-editable**: a maintainer adds, edits, or removes rows through an inline form, so the library of fixed, verified input→result cases **accumulates over time** as new outcomes are discovered. Every example is a real, verified input (the mock's planted member IDs, a fresh vs. taken username, a too-short password, the public SauceDemo / The Internet test credentials) — not a placeholder.
+
+Each example also carries an optional **`expect` output assertion** — a JSON object (e.g. `{"status": "ACTIVE"}`) the returned result must satisfy. It is **per-example and independent**: different examples can assert different fields (or different values), or none at all. When a run carries an assertion it becomes a **hard gate** (see §3) — a returned JSON that fails it is reclassified as **failure**, never "success but wrong".
 
 ## 3. Determinism & error handling
 
@@ -76,6 +86,8 @@ The result contract has exactly three states: **success** (goal reached, typed o
 The boundary is drawn deliberately: **a page-returned "error message" is a business_outcome, not a failure.** `ACCESS DENIED`, `INVALID PASSWORD`, "wrong password" — these are the target app *correctly reporting a business rule*, and the task did its job (it reached the page and read the answer back). Only a **mid-run error-out** — a locator that can't be resolved, a step that throws, a success checkpoint that never appears — is a `failure`, because that's the one case where no JSON answer was produced.
 
 From the **caller's** point of view the contract collapses to a binary: **a call succeeded if it returned a usable JSON result.** Both `success` and `business_outcome` return structured JSON — success → the extracted fields, business_outcome → an explicit `{"outcome": "member not found"}` object — so both count as a *successful call*. Only `failure` — a mid-run error-out that returns no JSON — is a real failure. Telemetry mirrors this: `succeeded = success + business_outcome`, and the headline rate is `succeeded / total`, not `success / total`.
+
+**The output assertion tightens this contract further.** A call may carry an optional `expect` (loaded from a filled example). When it does, returning *any* JSON is no longer enough: the returned JSON must **satisfy the assertion**, and a mismatch is reclassified as **failure** — even if the checkpoint matched and the classifier said success. This is the deepest correctness signal in the system: a JSON that is well-formed but doesn't contain the expected fields or values means the task itself is broken (a wrong extractor, a wrong success signal, a mislabeled business outcome) — the one failure mode that a bare "did it return JSON?" check cannot catch. The assertion is enforced **server-side at record time**, so the statistics report, the task health state, and the failure-replay loop all treat it as a true failure, not a cosmetic "looks wrong". Comparison is deliberately loose so a tester asserts the *semantic* value, not the raw string: a numeric string `"1001"` matches the number `1001`, and booleans match `"true"`/`"false"`. (Rendered currency like `"$4,250.00"` is matched literally — the assertion compares what the task actually extracted.)
 
 Robustness comes from four concrete mechanisms:
 
