@@ -59,6 +59,11 @@ class InputSpec(BaseModel):
     type: str = "str"
     required: bool = True
     description: str = ""
+    bind: str = ""   # dotted path into the *calling user's* private data (e.g.
+                     # "userBO.eeID"). When set, this input is auto-fetched from
+                     # the user's own folder at replay — never typed by the runner
+                     # — and the value is resolved server-side so a caller cannot
+                     # spoof their own member id / employee id.
 
 
 class OutputSpec(BaseModel):

@@ -27,12 +27,20 @@ USERS = {
         "password": "alice123",              # /user login password
         "legacy_username": "admin",          # legacy-app account
         "legacy_password": "secret123",      # legacy-app password (encrypted)
+        "userBO": {                          # per-user business object — the
+            "eeID": "1001",                  #   fields a task input can bind to
+            "department": "Member Services",
+        },
     },
     "bob": {
         "name": "Bob Chen",
         "password": "bob123",
         "legacy_username": "bob_op",
         "legacy_password": "bobpass123",
+        "userBO": {
+            "eeID": "1002",
+            "department": "Risk",
+        },
     },
 }
 
@@ -52,6 +60,7 @@ def main() -> None:
             "name": u["name"],
             "password_hash": hash_password(u["password"]),
             "legacy_username": u["legacy_username"],
+            "userBO": u.get("userBO", {}),
         }, indent=2))
         user_key = derive_key(f"user:{uid}", master)
         (folder / "credentials.json").write_text(json.dumps({

@@ -37,6 +37,7 @@ run "Phase 5 — 安全（加密/allowlist/handoff）"             agent.test_ph
 run "Phase 3 — artifact 序列化"                             agent.test_artifact
 run "Phase 2 — K3 视觉兜底"                                 agent.test_vision_fallback
 run "Phase 6 — 证据 & 可观测性（ReplayStore/遥测/inbox）"   agent.test_observability
+run "Phase 7 — 每用户输入绑定（userBO.eeID 自动抓取 + 防篡改）" agent.test_binding
 
 # 2. 如果是本脚本拉起的 mock，测完关掉
 if [ "$STARTED_MOCK" = "1" ]; then

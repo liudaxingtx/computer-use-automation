@@ -391,6 +391,15 @@ const RESULT = { success: 'Success', business_outcome: 'Business outcome', failu
 let currentTaskName = null;            // task whose detail modal is currently open
 let currentExamples = [];              // examples for the open task (for fillExample)
 const JOBS = { notified: new Set() };  // optimize job ids we've already surfaced
+let USERDATA_FIELDS = [];              // bindable per-user fields (e.g. "userBO.eeID")
+
+async function loadUserdataSchema() {
+  try {
+    const res = await fetch('/api/userdata-schema');
+    const d = await res.json();
+    USERDATA_FIELDS = (d.fields || []).filter(f => f.startsWith('userBO.'));
+  } catch (e) { /* non-fatal — the bind pick-list is a convenience */ }
+}
 
 function fmtRunStats(r) {
   if (!r) return '';
@@ -477,11 +486,15 @@ function renderModal(t) {
 
   const paramsTable = (t.inputs || []).length ? `
     <table class="ptable">
-      <thead><tr><th>parameter</th><th>type</th><th>required</th><th>description</th></tr></thead>
+      <thead><tr><th>parameter</th><th>type</th><th>required</th><th>description</th><th>bind (user data)</th></tr></thead>
       <tbody>${(t.inputs || []).map(i => `
-        <tr><td><code>${esc(i.name)}</code></td><td>${esc(i.type)}</td><td>${i.required ? 'yes' : 'no'}</td><td>${esc(i.description || '—')}</td></tr>`).join('')}
+        <tr><td><code>${esc(i.name)}</code></td><td>${esc(i.type)}</td><td>${i.required ? 'yes' : 'no'}</td><td>${esc(i.description || '—')}</td><td><input class="bind-input" data-bind-for="${esc(i.name)}" value="${esc(i.bind || '')}" placeholder="e.g. userBO.eeID" list="udf-list" autocomplete="off" style="background:var(--panel-2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px 8px;font-size:12px;width:150px;outline:none;"></td></tr>`).join('')}
       </tbody>
-    </table>` : '';
+    </table>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="color:var(--dim);font-size:11.5px;">A bound input is auto-fetched from the caller's account data (hidden from the user runner). Leave blank to type manually.</span>
+      <button class="fill" onclick="saveBindings('${esc(t.name)}')">Save bindings</button>
+    </div>` : '';
 
   const outputsHtml = (t.outputs || []).length ? `
     <table class="ptable">
@@ -566,6 +579,7 @@ function renderModal(t) {
     </div>` : '<div class="empty">No runs recorded yet.</div>';
 
   $('#modal').innerHTML = `
+    <datalist id="udf-list">${USERDATA_FIELDS.map(f => `<option value="${esc(f)}"></option>`).join('')}</datalist>
     <div class="mhead">
       <span class="mname" id="taskName">${esc(t.name)}</span>
       <button class="fill" onclick="startRename()" title="Rename">✎</button>
@@ -776,6 +790,25 @@ async function saveRename() {
     toast('Error: ' + String(e));
     cancelRename(currentTaskName);
   }
+}
+
+async function saveBindings(name) {
+  const els = document.querySelectorAll('.bind-input');
+  let changed = 0;
+  for (const el of els) {
+    const input = el.dataset.bindFor;
+    const bind = el.value.trim();
+    const res = await fetch('/api/bind', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: name, input, bind })
+    });
+    const r = await res.json();
+    if (!r.ok) { toast('Bind failed: ' + (r.error || 'error')); return; }
+    changed++;
+  }
+  toast(changed ? `Saved ${changed} binding(s)` : 'No bindings changed');
+  loadTasks();
+  openTask(name);   // re-open to reflect the bumped version + persisted bindings
 }
 
 async function runTest(name) {
@@ -1222,6 +1255,7 @@ document.addEventListener('click', e => {
 });
 $('#lightbox').addEventListener('click', () => $('#lightbox').classList.remove('open'));
 
+loadUserdataSchema();
 loadTasks();
 setInterval(refreshJobs, 3000);
 refreshJobs();

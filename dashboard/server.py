@@ -134,6 +134,63 @@ def _inject_credentials(cap, inputs: dict, user_id: str | None) -> dict:
         out["password"] = creds["legacy_password"]
     return out
 
+
+def _resolve_user_data(user_id: str | None, path: str):
+    """Resolve a dotted path (e.g. "userBO.eeID") against the user's private
+    profile. Returns the leaf value, or None if the path is absent."""
+    if not user_id or not path:
+        return None
+    prof = _load_profile(user_id)
+    if not prof:
+        return None
+    node = prof
+    for part in path.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return None
+        node = node[part]
+    return node
+
+
+def _bind_user_data(cap, inputs: dict, user_id: str | None) -> tuple[dict, list[str]]:
+    """Auto-fetch inputs declared `bind: "<path>"` from the calling user's own
+    private data (profile.json). Returns (inputs, missing_bindings).
+
+    A bound input is ALWAYS taken from the user's folder — never from the
+    request body — so a runner cannot spoof their own member id / employee id.
+    This is the "成熟的 solution 不暴露自动抓取值" rule: the runner never sees
+    or types a bound input; the server fills it from the user's private record."""
+    if not user_id:
+        return inputs, []
+    out = dict(inputs)
+    missing = []
+    for spec in cap.inputs:
+        if not spec.bind:
+            continue
+        val = _resolve_user_data(user_id, spec.bind)
+        if val is None:
+            missing.append(f"{spec.name} (path {spec.bind})")
+            continue
+        out[spec.name] = val
+    return out, missing
+
+
+def _userdata_schema() -> dict:
+    """The set of bindable fields across all seeded users, as dotted paths
+    (e.g. "userBO.eeID"). The admin console uses this to offer a pick-list when
+    binding a task input to user data."""
+    fields: set[str] = set()
+    if USERS_DIR.exists():
+        for p in USERS_DIR.glob("*/profile.json"):
+            try:
+                prof = json.loads(p.read_text())
+            except Exception:
+                continue
+            for ns, obj in prof.items():
+                if isinstance(obj, dict):
+                    for k in obj:
+                        fields.add(f"{ns}.{k}")
+    return {"fields": sorted(fields)}
+
 # The mock pages each capability's replay path can touch, in order.
 # Keyed by capability name so each task shows only the pages it actually visits.
 SHOT_MAP = {
@@ -343,6 +400,13 @@ def _run_task(name: str, inputs: dict, source: Literal["user", "admin"] = "user"
     # Inject the calling user's own legacy credential (username/password) from
     # their private folder, so a replay never falls back to a shared account.
     inputs = _inject_credentials(cap, inputs, user_id)
+    # Auto-fetch bound inputs (e.g. member_id <- userBO.eeID) from the user's
+    # own folder. A bound input that can't be resolved is a pre-flight config
+    # error — the run never starts, so nothing is recorded.
+    inputs, missing = _bind_user_data(cap, inputs, user_id)
+    if missing:
+        return {"error": "bound input(s) could not be resolved from your account "
+                         "data: " + "; ".join(missing)}
     return _execute_replay(cap, inputs, name, source=source, expect=expect,
                            user_id=user_id)
 
@@ -900,6 +964,34 @@ def _edit_examples(name: str, action: str, index: int, example: dict) -> dict:
     return {"ok": True, "examples": [e.model_dump() for e in cap.examples]}
 
 
+def _set_bind(name: str, input_name: str, bind: str) -> dict:
+    """Set (or clear) a task input's `bind` path — the per-user data field it is
+    auto-fetched from (e.g. "userBO.eeID"). This is how a maintainer declares
+    that an input is private to each user and must not be typed by the runner.
+
+    Changing a binding changes the solution contract, so — like an optimize —
+    the version is patch-bumped and the verified/error status is reset (a
+    previously-verified run no longer proves the new binding)."""
+    cap = _load_capability(name)
+    target = None
+    for spec in cap.inputs:
+        if spec.name == input_name:
+            target = spec
+            break
+    if target is None:
+        return {"ok": False, "error": f"input '{input_name}' not found on task '{name}'"}
+    new_bind = (bind or "").strip()
+    target.bind = new_bind
+    from datetime import datetime, timezone
+    cap.meta.version = _bump_version(cap.meta.version)
+    cap.meta.optimized_at = datetime.now(timezone.utc)
+    (ARTIFACT_DIR / f"{name}.json").write_text(cap.model_dump_json(indent=2))
+    return {"ok": True, "name": name, "input": input_name, "bind": new_bind,
+            "version": cap.meta.version,
+            "inputs": [i.model_dump() for i in cap.inputs]}
+
+
+
 def build_tasks() -> dict:
     caps = _capabilities()
     tasks = [_task_summary(c) for c in caps]
@@ -971,6 +1063,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"user": {"id": user_id, "name": prof.get("name", user_id)}})
         elif path == "/api/tasks":
             self._json(build_tasks())
+        elif path == "/api/userdata-schema":
+            self._json(_userdata_schema())
         elif path == "/api/runs":
             self._json(_runs_json())
         elif path == "/api/stats":
@@ -1064,6 +1158,10 @@ class Handler(BaseHTTPRequestHandler):
                     int(data.get("index", -1)),
                     data.get("example") or {},
                 ))
+            elif path == "/api/bind":
+                self._json(_set_bind(
+                    data.get("task", ""), data.get("input", ""), data.get("bind", "")
+                ))
             elif path == "/api/rename":
                 self._json(_rename_task(
                     data.get("task", ""), data.get("new_name", "")
@@ -1090,9 +1188,26 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+class _ThreadingHTTPServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer that skips HTTPServer's reverse-DNS lookup.
+
+    Python's http.server.HTTPServer.server_bind() calls socket.getfqdn(host),
+    which on macOS does a reverse-DNS (mDNS) lookup that can hang indefinitely
+    when mDNSResponder doesn't answer — leaving the socket in CLOSED (never
+    LISTEN). server_name is only used for logging (which we suppress), so set it
+    to the raw host string instead of resolving it.
+    """
+    def server_bind(self):
+        import socketserver
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = str(host)
+        self.server_port = port
+
+
 def main() -> None:
     print(f"task dashboard on http://localhost:{PORT}  (LAN: http://<this-mac-ip>:{PORT})")
-    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    _ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 
 
 if __name__ == "__main__":

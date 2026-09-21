@@ -256,8 +256,12 @@ function onSelect() {
   $('#tVerified').className = 'badge verified';
   $('#tDesc').textContent = t.description || '';
 
-  const inputs = t.inputs || [];
-  $('#params').innerHTML = inputs.length
+  const allInputs = t.inputs || [];
+  // Bound inputs (i.bind) are auto-fetched from the user's own account data by
+  // the server — the runner never sees or types them (e.g. member_id <- userBO.eeID).
+  const inputs = allInputs.filter(i => !i.bind);
+  const boundCount = allInputs.length - inputs.length;
+  const fieldsHtml = inputs.length
     ? inputs.map(i => {
         // credential-like inputs are auto-filled from the user's own folder
         // (server injects them on run anyway); hint so the tester doesn't type.
@@ -273,7 +277,15 @@ function onSelect() {
                placeholder="${isCred ? 'auto-filled from your account' : ''}"
                class="${isCred ? 'autofilled' : ''}">
       </div>`}).join('')
-    : '<div class="empty">This task takes no inputs.</div>';
+    : '';
+  const boundNote = boundCount
+    ? `<div class="hint" style="margin-top:2px">${boundCount} field${boundCount > 1 ? 's are' : ' is'} filled automatically from your account.</div>`
+    : '';
+  $('#params').innerHTML = fieldsHtml
+    ? fieldsHtml + boundNote
+    : (boundCount
+        ? '<div class="empty">This task runs on your account data automatically — nothing to fill in.</div>'
+        : '<div class="empty">This task takes no inputs.</div>');
 
   $('#taskinfo').style.display = 'block';
   $('#runBtn').disabled = false;

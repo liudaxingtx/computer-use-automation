@@ -2,5 +2,9 @@
   "id": "bob",
   "name": "Bob Chen",
   "password_hash": "sha256:f6479c10486c62b650b3b339abdadb0f8f3cd551c7c4e10a4616f3bc1a1ee1cc",
-  "legacy_username": "bob_op"
+  "legacy_username": "bob_op",
+  "userBO": {
+    "eeID": "1002",
+    "department": "Risk"
+  }
 }

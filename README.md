@@ -167,7 +167,17 @@ The `/user` runner is **login-gated**. Two mock users are pre-seeded (re-run `py
 
 Each user owns a private folder `users/<id>/`:
 
-- `profile.json` — login identity: `name`, `password_hash` (salted sha256, **never plaintext**), and the legacy-app username.
+- `profile.json` — login identity: `name`, `password_hash` (salted sha256, **never plaintext**), the legacy-app username, and a `userBO` business object (e.g. `{"eeID": "1001", "department": "Member Services"}`) — the per-user fields a task input can bind to.
 - `credentials.json` — the legacy-app password, **AES-256-GCM encrypted** under a per-user key derived from the master key (`SHA-256(master ‖ user id)`), so one user's folder can't be decrypted with another's key.
 
 When a logged-in user runs a task whose inputs declare `username`/`password`, the replay injects that user's **own** legacy credential (decrypted only at the moment of use) — never a shared service account, and only when the user hasn't already supplied the value. Every run is stamped with `user_id`, so the audit log can answer "who did this, when".
+
+### 4.8 Input binding — auto-fetch from the caller's own data
+
+Some inputs are private to each user and must never be typed by them (a member id is bound to the employee, not something they choose). A task input can declare a **`bind` path** — a dotted reference into the caller's `profile.json` (e.g. `userBO.eeID`) — and the replay resolves that value from the *calling user's* folder at run time, never from the request body:
+
+- **Configured in admin** — the task detail's parameter table has a `bind (user data)` column with a pick-list of bindable fields; edit + **Save bindings** (this patch-bumps the version and resets verified status, like an optimize).
+- **Hidden from the runner** — a bound input is dropped from the `/user` form entirely; the employee never sees or types it.
+- **Spoof-proof** — the server always overrides a caller-supplied value with the bound one, so a user can't look up someone else's member id.
+
+Two distinct mechanisms cover private data: legacy `username`/`password` come from `credentials.json` (encrypted); everything else (member id, employee id, department) is a `bind` into `userBO`. The shipped demo binds `lookup_member.member_id ← userBO.eeID`, so alice resolves to member **1001** (JOHN SMITH) and bob to **1002** (JANE DOE) without either typing a member id. `GET /api/userdata-schema` lists the bindable fields; `POST /api/bind` sets or clears a binding.
