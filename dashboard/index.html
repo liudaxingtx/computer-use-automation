@@ -239,6 +239,12 @@
   .pill.business_outcome { color: var(--amber); background: rgba(251,191,36,0.12); }
   .pill.failure { color: var(--red); background: rgba(248,113,113,0.12); }
 
+  .exbox { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel-2); }
+  .ex-title { font-size: 11px; color: var(--dim); margin-bottom: 6px; }
+  .exbox .ptable { margin-bottom: 0; }
+  .fill { background: rgba(56,189,248,0.12); color: var(--cyan); border: 1px solid rgba(56,189,248,0.35); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .fill:hover { background: rgba(56,189,248,0.22); }
+
   .empty { color: var(--dim); font-size: 13px; padding: 14px 0; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
     background: #0f1a2b; border: 1px solid var(--line); color: var(--txt); padding: 10px 18px;
@@ -361,6 +367,7 @@ function normalizeInput(s) {
 
 const RESULT = { success: 'Success', business_outcome: 'Business outcome', failure: 'Failure' };
 let currentTaskName = null;            // task whose detail modal is currently open
+let currentExamples = [];              // examples for the open task (for fillExample)
 const JOBS = { notified: new Set() };  // optimize job ids we've already surfaced
 
 function fmtRunStats(r) {
@@ -438,6 +445,7 @@ async function openTask(name) {
 }
 
 function renderModal(t) {
+  currentExamples = t.examples || [];
   const inputsHtml = (t.inputs || []).map(i => `
     <div class="field">
       <label>${esc(i.name)}${i.required ? ' <span class="req">*</span>' : ''}</label>
@@ -463,13 +471,14 @@ function renderModal(t) {
 
   const examplesHtml = (t.examples || []).length ? `
     <table class="ptable">
-      <thead><tr><th>#</th><th>inputs</th><th>expected</th><th>you should see</th></tr></thead>
+      <thead><tr><th>#</th><th>outcome</th><th>input values</th><th>you'll see</th><th></th></tr></thead>
       <tbody>${(t.examples || []).map((e, i) => `
         <tr>
           <td>${i + 1}</td>
-          <td><code>${esc(JSON.stringify(e.inputs))}</code></td>
           <td><span class="pill ${e.result}">${RESULT[e.result] || e.result}</span></td>
+          <td><code>${esc(JSON.stringify(e.inputs))}</code></td>
           <td>${esc(e.note || '')}</td>
+          <td><button class="fill" onclick="fillExample(${i})">fill ▸</button></td>
         </tr>`).join('')}
       </tbody>
     </table>` : '';
@@ -527,6 +536,11 @@ function renderModal(t) {
       </div>
       ${paramsTable ? `<div class="params">${paramsTable}</div>` : ''}
       <div class="inputs">${inputsHtml || '<span class="empty">This task takes no inputs.</span>'}</div>
+      ${examplesHtml ? `
+        <div class="exbox">
+          <div class="ex-title">Test cases — click "fill ▸" to load an input, then Execute</div>
+          ${examplesHtml}
+        </div>` : ''}
       <button class="run" style="margin-top:12px" onclick="runTest('${esc(t.name)}')">▶ Execute</button>
       <div class="result" id="result"></div>
     </div>
@@ -534,11 +548,6 @@ function renderModal(t) {
     <div class="msection">
       <h3>Extracted outputs</h3>
       ${outputsHtml || '<div class="empty">This task declares no outputs.</div>'}
-    </div>
-
-    <div class="msection">
-      <h3>Test examples — run these to verify</h3>
-      ${examplesHtml || '<div class="empty">No examples recorded.</div>'}
     </div>
 
     <div class="msection">
@@ -570,6 +579,16 @@ function renderModal(t) {
 function highlight(v) {
   // highlight {param} placeholders
   return esc(v).replace(/\{(\w+)\}/g, '<span class="param">{$1}</span>');
+}
+
+function fillExample(i) {
+  const ex = currentExamples[i];
+  if (!ex) return;
+  for (const [k, v] of Object.entries(ex.inputs || {})) {
+    const el = document.querySelector(`[data-input="${k}"]`);
+    if (el) el.value = v;
+  }
+  toast('Inputs filled — press Execute to verify');
 }
 
 async function runTest(name) {
