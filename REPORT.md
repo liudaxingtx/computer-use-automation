@@ -65,7 +65,7 @@ Six principles govern it:
 
 The schema is the contract the calling agent sees, not just a step list: typed inputs it supplies, typed outputs it gets back, and a checkpoint that defines success.
 
-Each capability also carries **runnable `examples`** — concrete input values mapped to their expected result (success / business_outcome / failure) with a note on what the tester should see. The admin console renders these as a "Test examples" table, so a tester can replay every listed case and confirm the result matches without knowing the target system's internals. Every example is a real, verified input (the mock's planted member IDs, a fresh vs. taken username, a too-short password, the public SauceDemo / The Internet test credentials) — not a placeholder.
+Each capability also carries **runnable `examples`** — concrete input values mapped to their expected result (success / business_outcome / failure) with a note on what the tester should see. The admin console renders these as an **outcome / input / note table positioned directly above the Execute button**, and every row has a one-click **fill** button that loads that exact input into the form — so a tester verifies a case by clicking fill then Execute, no typing and no knowledge of the target system's internals required. Every example is a real, verified input (the mock's planted member IDs, a fresh vs. taken username, a too-short password, the public SauceDemo / The Internet test credentials) — not a placeholder.
 
 ## 3. Determinism & error handling
 
@@ -105,6 +105,26 @@ Optimize is a **long-hold background job**:
 - **Completion is surfaced to the page.** The console polls the registry and, when a job lands, shows a toast and refreshes the task view if the maintainer is still looking at it — no manual refresh.
 - **It already paid for itself.** This is exactly how the `deactivate_member` hallucinated `status` output (a discovery-time LLM invention that always extracted `null`) was removed — one sentence, one validated patch, verified empty outputs afterward.
 - **And it exposed a taxonomy bug.** `deactivate_member`'s "permission denied" failures were a *classification* error, not a system error: `ACCESS DENIED` (a restricted member can't be deactivated) had been recorded as a `failure_pattern` instead of a `business_outcome`, so a correctly-behaving task looked broken. Moving it (and `register_operator`'s `INVALID PASSWORD` / `INVALID INPUT`) to `business_outcomes` drove the recorded failure rate to zero.
+
+### Task status lifecycle
+
+Every task carries a three-state health signal, and it is the basis for how much a caller can trust the task:
+
+- **unverified** — freshly optimized (or never yet run successfully); the solution path just changed, so prior results no longer describe it.
+- **verified** — at least one successful run since the last optimize.
+- **error** — any hard failure (a mid-run error-out that returned no JSON) since the last optimize: the task is broken.
+
+The judgement is anchored on `optimized_at`: only runs *after* the last optimize count. That is the load-bearing rule — optimizing rewrites the solution path, so a success (or failure) recorded against the *old* path must not keep vouching for the *new* one. Optimizing therefore resets a verified task back to **unverified**, and a task re-earns **verified** only by a fresh successful run.
+
+Failure is sticky and visible, and the system routes around a broken task automatically:
+
+- A single hard failure flips the task to **error**, and it stays there until the maintainer optimizes it and a fresh run succeeds.
+- In the admin console an errored task is **highlighted red** so it stands out for repair.
+- In the user runner an errored task is **hidden entirely** — a user can never invoke a task that is known to be broken; it simply stops appearing.
+
+The header counts (Verified / Unverified / Error) refresh **live** after every Execute, Replay, or optimize — no manual page reload — so the board always reflects current health.
+
+This closes the loop with continuous optimization above: **optimize → unverified → run to re-verify → verified**, and a regression is caught the instant a failure lands rather than when a human happens to notice. The "hide broken tasks from users" rule is the same instinct as the failure taxonomy itself: a task that errored out and produced no JSON should not keep being offered to real callers.
 
 ## 4. Heterogeneity & multi-tenant
 
