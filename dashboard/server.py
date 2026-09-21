@@ -12,6 +12,7 @@ Endpoints:
 
 Run from the repo root:  .venv/bin/python -m dashboard.server
 """
+import hashlib
 import json
 import re
 import secrets
@@ -26,13 +27,112 @@ from urllib.parse import parse_qs, unquote, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from agent.crypto import decrypt, derive_key, master_key_from_env  # noqa: E402
 from agent.observability import ARTIFACT_DIR, EVIDENCE_DIR, RUNS_DIR, ReplayStore  # noqa: E402
 
 INDEX = ROOT / "dashboard" / "index.html"
 USER_INDEX = ROOT / "dashboard" / "user.html"
 SHOTS = ROOT / "dashboard" / "screenshots"
+USERS_DIR = ROOT / "users"
 PORT = 8123
 MOCK_URL = "http://localhost:9000/"
+
+# --- Per-user login & isolation ---------------------------------------------
+# The /user runner is login-gated. Each user has a private folder users/<id>/
+# holding their identity (password_hash) and their legacy-app credentials
+# (password AES-256-GCM encrypted under a per-user key). A logged-in session is
+# a random token -> user_id in memory; replays carry the user_id so the audit
+# log can answer "who did this", and the legacy credential is injected from the
+# user's own folder (never a shared service account).
+_SESSIONS: dict[str, str] = {}
+_SESSIONS_LOCK = threading.Lock()
+_SALT = "demo-salt"
+
+
+def _hash_password(pw: str) -> str:
+    return "sha256:" + hashlib.sha256((_SALT + pw).encode()).hexdigest()
+
+
+def _load_profile(user_id: str) -> dict | None:
+    p = USERS_DIR / user_id / "profile.json"
+    if not p.is_file():
+        return None
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return None
+
+
+def _load_credentials(user_id: str) -> dict | None:
+    p = USERS_DIR / user_id / "credentials.json"
+    if not p.is_file():
+        return None
+    try:
+        return json.loads(p.read_text())
+    except Exception:
+        return None
+
+
+def _authenticate(username: str, password: str) -> str | None:
+    prof = _load_profile(username)
+    if prof and prof.get("password_hash") == _hash_password(password):
+        return username
+    return None
+
+
+def _new_session(user_id: str) -> str:
+    token = secrets.token_hex(16)
+    with _SESSIONS_LOCK:
+        _SESSIONS[token] = user_id
+    return token
+
+
+def _session_user(token: str | None) -> str | None:
+    if not token:
+        return None
+    with _SESSIONS_LOCK:
+        return _SESSIONS.get(token)
+
+
+def _drop_session(token: str | None) -> None:
+    if not token:
+        return
+    with _SESSIONS_LOCK:
+        _SESSIONS.pop(token, None)
+
+
+def _legacy_credentials(user_id: str) -> dict | None:
+    """Return this user's legacy-app credentials with the password decrypted.
+    The per-user key means one user's folder cannot decrypt another's."""
+    creds = _load_credentials(user_id)
+    if not creds:
+        return None
+    key = derive_key(f"user:{user_id}", master_key_from_env())
+    try:
+        return {
+            "legacy_username": creds.get("legacy_username"),
+            "legacy_password": decrypt(creds["legacy_password"], key),
+        }
+    except Exception:
+        return None
+
+
+def _inject_credentials(cap, inputs: dict, user_id: str | None) -> dict:
+    """Fill a task's username/password inputs from the logged-in user's own
+    credential folder — never a shared account. Only inject when the input is
+    not already supplied, and only for inputs the task actually declares."""
+    if not user_id:
+        return inputs
+    creds = _legacy_credentials(user_id)
+    if not creds:
+        return inputs
+    declared = {i.name for i in cap.inputs}
+    out = dict(inputs)
+    if "username" in declared and not out.get("username"):
+        out["username"] = creds["legacy_username"]
+    if "password" in declared and not out.get("password"):
+        out["password"] = creds["legacy_password"]
+    return out
 
 # The mock pages each capability's replay path can touch, in order.
 # Keyed by capability name so each task shows only the pages it actually visits.
@@ -190,7 +290,7 @@ def _task_detail(cap) -> dict:
 
 def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
                     source: Literal["user", "admin"] = "user",
-                    expect: dict | None = None) -> dict:
+                    expect: dict | None = None, user_id: str | None = None) -> dict:
     from playwright.sync_api import sync_playwright
 
     from agent.replay import assert_outputs, replay
@@ -205,6 +305,7 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
         browser.close()
     run.source = source
     run.expect = expect or None
+    run.user_id = user_id
 
     # Output assertion: when an `expect` is supplied, a returned JSON that
     # doesn't satisfy it is a HARD FAILURE — not a success. A JSON that looks
@@ -237,9 +338,13 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
 
 
 def _run_task(name: str, inputs: dict, source: Literal["user", "admin"] = "user",
-              expect: dict | None = None) -> dict:
+              expect: dict | None = None, user_id: str | None = None) -> dict:
     cap = _load_capability(name)
-    return _execute_replay(cap, inputs, name, source=source, expect=expect)
+    # Inject the calling user's own legacy credential (username/password) from
+    # their private folder, so a replay never falls back to a shared account.
+    inputs = _inject_credentials(cap, inputs, user_id)
+    return _execute_replay(cap, inputs, name, source=source, expect=expect,
+                           user_id=user_id)
 
 
 def _rerun_task(run_id: str) -> dict:
@@ -829,12 +934,41 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return {}
 
+    def _cookie(self) -> str | None:
+        header = self.headers.get("Cookie", "")
+        for part in header.split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == "session":
+                return v or None
+        return None
+
+    def _current_user(self) -> str | None:
+        return _session_user(self._cookie())
+
+    def _json_with_cookie(self, obj, cookie: str | None, status: int = 200) -> None:
+        body = json.dumps(obj, indent=2).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
             self._send(INDEX.read_bytes(), "text/html; charset=utf-8")
         elif path in ("/user", "/user.html"):
             self._send(USER_INDEX.read_bytes(), "text/html; charset=utf-8")
+        elif path == "/api/me":
+            user_id = self._current_user()
+            if not user_id:
+                self._json({"user": None}, 401)
+            else:
+                prof = _load_profile(user_id) or {}
+                self._json({"user": {"id": user_id, "name": prof.get("name", user_id)}})
         elif path == "/api/tasks":
             self._json(build_tasks())
         elif path == "/api/runs":
@@ -874,6 +1008,25 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             data = self._read_json()
+            if path == "/api/login":
+                username = (data.get("username") or "").strip()
+                password = data.get("password") or ""
+                user_id = _authenticate(username, password)
+                if not user_id:
+                    self._json_with_cookie({"ok": False, "error": "invalid credentials"},
+                                           None, 401)
+                    return
+                token = _new_session(user_id)
+                prof = _load_profile(user_id) or {}
+                self._json_with_cookie(
+                    {"ok": True, "user": {"id": user_id, "name": prof.get("name", user_id)}},
+                    f"session={token}; Path=/; HttpOnly")
+                return
+            if path == "/api/logout":
+                _drop_session(self._cookie())
+                self._json_with_cookie({"ok": True},
+                                       "session=; Path=/; Max-Age=0")
+                return
             if path == "/api/run":
                 name = data.get("task")
                 inputs = data.get("inputs") or {}
@@ -884,7 +1037,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not name:
                     self._json({"error": "task required"}, 400)
                     return
-                self._json(_run_task(name, inputs, source=source, expect=expect))
+                user_id = self._current_user()
+                self._json(_run_task(name, inputs, source=source, expect=expect,
+                                     user_id=user_id))
             elif path == "/api/rerun":
                 run_id = data.get("run_id")
                 if not run_id:

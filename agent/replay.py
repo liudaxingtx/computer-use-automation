@@ -39,6 +39,7 @@ class ReplayRun(BaseModel):
     resolved_result: Optional[str] = None       # a failed run later fixed: the new result
     resolved_at: Optional[datetime] = None      # when a successful re-run verified the fix
     expect: Optional[dict] = None               # output assertion carried by this invocation
+    user_id: Optional[str] = None               # which logged-in user invoked it (None = admin)
 
 
 def _value_matches(actual, expected) -> bool:

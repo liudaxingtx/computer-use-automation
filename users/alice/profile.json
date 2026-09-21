@@ -1,0 +1,6 @@
+{
+  "id": "alice",
+  "name": "Alice Smith",
+  "password_hash": "sha256:1f9485cff39dc9c5d631edeb4779211464297d7464e5b888dea465c414d221d5",
+  "legacy_username": "admin"
+}

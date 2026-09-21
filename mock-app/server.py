@@ -37,9 +37,11 @@ MEMBERS = {
 }
 
 # In-memory operator accounts (register/login). `admin` is pre-seeded so login
-# has a known good credential; register adds more at runtime.
+# has a known good credential; register adds more at runtime. `bob_op` gives the
+# second demo user a distinct legacy identity for per-user isolation.
 USERS = {
     "admin": {"password": "secret123", "email": "admin@fiserv.com"},
+    "bob_op": {"password": "bobpass123", "email": "bob@fiserv.com"},
 }
 
 
