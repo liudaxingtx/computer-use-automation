@@ -523,6 +523,17 @@ def _delete_task(name: str) -> dict:
     }
 
 
+def _reset_runs() -> dict:
+    """Delete every recorded run, clearing the statistics report — a clean slate
+    for a fresh test run. Returns how many runs were removed."""
+    removed = 0
+    if RUNS_DIR.exists():
+        for f in RUNS_DIR.glob("*.json"):
+            f.unlink()
+            removed += 1
+    return {"ok": True, "removed": removed}
+
+
 def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")[:40]
 
@@ -710,7 +721,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:
         path = urlparse(self.path).path
-        if path.startswith("/api/task/"):
+        if path == "/api/runs":
+            self._json(_reset_runs())
+        elif path.startswith("/api/task/"):
             name = unquote(path[len("/api/task/"):])
             try:
                 self._json(_delete_task(name))

@@ -660,6 +660,7 @@ function renderStats(d) {
     <span class="clog-stat"><span class="ok"><b>${d.succeeded ?? 0}</b> succeeded · ${pct(d.success_rate)}</span></span>
     <span class="clog-stat" style="opacity:.65"><span class="bo">${d.success ?? 0} clean · ${d.business_outcome ?? 0} business</span></span>
     <span class="clog-stat"><span class="fl"><b>${d.failure ?? 0}</b> failed · ${pct(d.failure_rate)}</span></span>
+    <button class="danger" style="margin-left:auto" onclick="resetRuns()">↺ Reset runs</button>
   </div>`;
 
   const sections = (d.by_task || []).map(t => {
@@ -684,6 +685,23 @@ function renderStats(d) {
   }).join('');
 
   $('#clbody').innerHTML = head + (sections || '<div class="empty">No calls recorded yet.</div>');
+}
+
+async function resetRuns() {
+  if (!confirm('Delete ALL recorded calls? This clears the statistics report and the failure/replay history. This cannot be undone.')) return;
+  try {
+    const res = await fetch('/api/runs', { method: 'DELETE' });
+    const r = await res.json();
+    if (r.ok) {
+      toast(`Reset ${r.removed} runs — statistics cleared`);
+      const d = await (await fetch('/api/stats')).json();
+      renderStats(d);
+    } else {
+      toast('Error: ' + (r.error || 'reset failed'));
+    }
+  } catch (e) {
+    toast('Error: ' + String(e));
+  }
 }
 
 function runRow(r) {

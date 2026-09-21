@@ -47,7 +47,7 @@ Then open:
 
 | URL | Who it's for | What it does |
 |---|---|---|
-| `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, statistics report (per-task user-call rates + replay failed calls in a full result modal), AI-optimize any task conversationally, delete, register new tasks |
+| `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, statistics report (per-task user-call rates + replay failed calls in a full result modal + reset all calls), AI-optimize any task conversationally, delete, register new tasks |
 | `http://localhost:8123/user` | **User runner** | Pick a task from a dropdown → fill its inputs → run → see the result |
 
 ### 1.5 Demo path — discover a goal, then replay it
