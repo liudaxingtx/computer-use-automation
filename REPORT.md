@@ -1,89 +1,87 @@
 # REPORT — Computer-Use Automation System
 
-> Design write-up for the interface.ai take-home. Implementation is complete and backed by real runs under `/evidence/` and `/artifacts/`.
+> Design write-up for the interface.ai take-home. The implementation is complete and validated by repeatable runs under `/evidence/` and `/artifacts/`.
 
 ## 1. Architecture
 
-Back-office software exposes no API — the only way in is to drive the UI like a human. This system is the integration layer that turns that into a safe, callable product: **an LLM discovers a flow once, the successful run is distilled into a typed artifact, and a deterministic engine replays it with no model in the loop.**
+The target backend exposes no API, so the only way in is to drive the UI like a human. The core decision is a **two-phase split — LLM discovery once, deterministic replay forever**. The LLM is used only during workflow authoring; runtime execution is model-free, which removes the non-determinism, cost, and latency of an in-loop LLM from everyday operation.
 
-The load-bearing invariant: **the LLM appears exactly once — during authoring — then leaves the loop.** Reliability, safety, and auditability all follow from that separation.
+Three roles sit over one execution core:
 
-```
-ENGINE (agent/)
-  DISCOVERY (LLM, once)   observe → decide → act   →   distills to a Capability
-  REPLAY (deterministic, forever)   act → assert → branch, three-state result
-        │
-  ADMIN console (/) — manage/create      USER runner (/user) — just use tasks
-```
+**Admin control plane** — AI-assisted management: discover new flows, optimize and version artifacts, bind input schemas, and watch task health and failure telemetry. Broken tasks are hidden from users and surfaced in the repair inbox.
 
-**Three roles over one engine.** The **admin console** is an AI-assisted control plane to add (discover), edit (optimize / bind inputs / rename), and delete tasks, and to watch the failure inbox and statistics. The **user runner** is a login-gated surface exposing only tasks not marked broken; each user has a private folder, their legacy credential is injected from it (never a shared account), and inputs bound to their own data (e.g. member id ← employee id) are auto-filled, never typed. The **audit** records every invocation append-only with the caller's identity; a hard failure flips a task to `error`, hides it from users, and surfaces it in the admin console for repair.
+**User runner plane** — a login-gated surface that serves only non-broken (non-error) tasks. It enforces per-user isolation: each user has a private folder, their own legacy credential is injected at runtime (never a shared account), and bound user attributes are auto-resolved rather than typed or spoofable.
 
-**Target.** The stand-in for the real thing is a deliberately-hostile local mock — a 1998-era banking portal with table-based layouts, terse labels, and no test IDs — plus the public SauceDemo / The Internet sandboxes for real-world verification. A hostile mock is the right proxy because it forces the load-bearing problems (a multi-step search → detail → action flow, and multi-modal outcomes where the *same* input returns *different* results) to be solved for real, rather than hidden behind a clean modern DOM.
+**Append-only audit plane** — records every invocation with the caller's identity. Hard failures are marked error, hidden from users, and persisted with AES-256-GCM-encrypted inputs; successful runs store no customer data at all.
 
-**Runtime & frameworks.** Python 3.12, Playwright (Chromium), Pydantic v2, the stdlib `http.server`, `httpx`, and `cryptography`. Playwright is chosen over Selenium/Puppeteer for its first-class accessibility-tree API (`get_by_role`/`get_by_name`), which is what makes replay *semantic* rather than coordinate-based, and over screenshot/CUA SDKs because driving the DOM through the a11y tree is deterministic and cheap — a vision model is only the fallback for image-only surfaces. Pydantic gives one typed, validated, diffable schema that doubles as the artifact format *and* the LLM's output contract. The web surface is a thin stdlib `ThreadingHTTPServer` — no framework — because the value is the engine, not the HTTP layer.
+**Key decisions & trade-offs**
 
-**LLM roles & agent loop.** Two provider-agnostic roles talk to any OpenAI-compatible endpoint through one thin `httpx` helper — no vendor SDK. A **decision** model drives the `observe → decide → act` loop and returns one strict JSON action per turn (tolerantly parsed; reasoning-model `reasoning_content` is separated from the answer); a **vision** model is the fallback when the accessibility tree is empty. Defaults are DeepSeek for decision and Moonshot Kimi for vision, but nothing is hard-wired — `DECISION_LLM_*` / `VISION_LLM_*` env vars repoint each role. Structuring the loop as a strict action-per-turn JSON — not a free-form agent — is what makes its output distillable into a deterministic artifact.
-
-**Boundaries.** One process, synchronous execution, no queue. Slow work (AI optimize, discovery) runs as background threads so a live call is never blocked. This is deliberately simpler than a worker/queue topology: the assignment is about deterministic replay, not scale, and a queue adds coordination without changing what a replay does. The seam is real — a queue/pool could be dropped in at the same `/api/run` boundary — but it isn't built (see §7).
-
-**Three trade-offs.** Accessibility tree first (text survives branding/version drift; vision is a fallback; screenshots are failure evidence only). Artifact decoupled from transcript (the model's monologue is discarded; a typed description persists). Depth over breadth (see §7).
+- **Accessibility-tree-first driving** — Playwright's semantic role/name locators, not coordinates or screenshots. Trades universal visual coverage for long-term replay stability; a vision model is only the fallback for image-only surfaces.
+- **Thin stdlib HTTP layer** (`ThreadingHTTPServer`) — no framework, so the codebase stays focused on the engine, not HTTP plumbing.
+- **Synchronous single process, heavy work in background threads** — no queue/worker complexity; discovery and optimize run in background threads so they never block a live call. Trades horizontal scaling for simplicity and deterministic guarantees.
 
 ## 2. Artifact schema
 
-The artifact is a **Capability** — a typed, versioned, reviewable description of one flow, stored as one diffable JSON file per task under `artifacts/` (version-controlled):
+All workflows persist as versioned, diffable, Pydantic-validated **Capability** artifacts — one JSON file per task under `/artifacts/`. The schema stores **intent, not runtime values or the agent transcript**, which is what enables reuse, human review, and deterministic replay.
 
 ```
 Capability
 ├─ meta (name, version, domain, start_url)
 ├─ inputs / outputs                          # typed specs; an input may carry a `bind` path
-├─ checkpoint_text                           # how success is recognized
+├─ checkpoint_text                           # the success signal
 ├─ business_outcomes / failure_patterns      # deterministic text signals
 ├─ examples                                  # runnable input→result cases, each with an optional `expect`
 └─ steps: [{ action, target{strategy, role, name, ordinal}, value, assertion, on_error }]
 ```
 
-It is shaped around six principles: **intent not coordinates** (locate by role+name, never pixels — one vendor's instance transfers to another's); **decoupled from transcript**; **every step asserts**; **errors are first-class** (`business_outcomes` = legitimate answers, `failure_patterns` = hard stops); **human-manageable** (Pydantic-validated, diffable JSON); **customer data encrypted at rest** (AES-256-GCM, per-tenant key).
-
-A key structural decision: **input parameters are placeholders, not values.** A `type` step records `{member_id}`, not `"1001"` — the artifact captures *intent*, and the concrete value is supplied at replay time. That is what lets one artifact serve many users and many institutions.
-
-**Per-user binding.** An input may declare a `bind` path (e.g. `userBO.eeID`). At replay the value is resolved from the *calling user's* private folder, never from the request body — so a member id bound to an employee is auto-filled and cannot be spoofed.
-
-Every task also declares a **standardized output contract**: **success** → typed fields (`{"name": …, "status": …}`); **business_outcome** → `{"outcome": "<label>"}`; **failure** → no JSON. A caller branches on the shape without inspecting the page.
+- **Inputs are placeholders, not values** — a `type` step records `{member_id}`, not `"1001"`. The artifact captures *how to run the flow*; credentials, user data, and environment specifics are injected at runtime. This is the seam for multi-tenant reuse.
+- **Dual outcome classification** — `business_outcomes` (legitimate expected answers) are separated from `failure_patterns` (hard errors), so a page-returned error is a *correct* result, not a crash.
+- **Per-step assertions and `on_error` rules** — the engine never assumes an action worked; every step verifies and declares its failure behavior.
+- **Per-user binding** — an input may declare a `bind` path (e.g. `userBO.eeID`), resolved from the calling user's folder at replay, so bound identity fields can't be spoofed.
+- **Versioned, diffable** — plain JSON under version control, AI-optimized patches auto-bump the version, and the artifact stays human-reviewable (unlike an opaque transcript).
 
 ## 3. Determinism & error handling
 
-Replay is **act → assert → branch**, classifying every result into one of three states: **success** (goal reached, typed outputs extracted), **business_outcome** (a legitimate expected answer — a page-returned error is a *correct* answer, not a crash), and **failure** (a mid-run error-out that produced no JSON). From the caller's view this collapses to a binary: **succeeded = success + business_outcome**; only `failure` is real.
+Replay is a strict **act → assert → branch** loop that classifies every run into three states: **success** (goal reached, typed outputs extracted), **business_outcome** (a valid non-success business state), and **failure** (an uncontrolled mid-run crash with no output). For a caller this collapses to binary: **succeeded = success + business_outcome**; only `failure` counts as broken.
 
-**How determinism is achieved.** Locator strategy is an enum — `accessibility` (role + name, falling back to role + ordinal) is primary because it targets *semantic* structure rather than volatile coordinates; `text`/`css`/`xpath` are fallbacks for non-semantic surfaces, and `visual` (coordinate clicking) is reserved but unbuilt. Every step carries an assertion, so the engine never assumes a click worked. Async single-page renders are handled by a bounded checkpoint poll (a short deadline, not an open wait). Recoverable failures retry a bounded number of times; hard failures stop.
+- **Semantic locators first** — role+name (accessibility tree) is primary, text/CSS/XPath are fallbacks; coordinates are avoided. This removes flakiness and tolerates branding/version drift.
+- **Every step asserts** — no silent partial failures; each click/input/navigation is verified before proceeding.
+- **Bounded polling and retries** — async SPA renders are handled by a deadline-bounded checkpoint poll (not an infinite wait); recoverable errors retry a capped number of times.
+- **`expect` output assertions** — beyond page-checkpoint matching, a structured output assertion hard-gates the result. A page that loads but returns wrong data is reclassified failure: the one failure mode a bare "did it return JSON?" check can't catch.
 
-**`expect` tightens it further.** A run carrying an output assertion must *satisfy* it or it is reclassified **failure** — even if the checkpoint matched. A well-formed JSON with the wrong fields means the task itself is broken: the one failure a bare "did it return JSON?" check can't catch. Enforced server-side, so stats, task health, and replay all see it as a true failure.
-
-**The observation loop.** Every run is recorded and re-runnable. Failures (the only no-JSON case) keep their input **encrypted** (`enc:…`, never decrypted in the report) plus a one-click **Replay** to reproduce the exact invocation; successful runs store no customer data at all. A failing task is fixed conversationally with **AI optimize** (plain-English → validated structured patch → version auto-bumped), run as a background job. Each task carries a three-state health signal — **verified / unverified / error** — anchored on the last optimize; a broken task is highlighted in admin and **hidden from users** until re-verified.
+**Failure → repair loop.** Every run is recorded and re-runnable. Failures (the only no-output case) keep their input encrypted (`enc:…`, never decrypted in the report) with a one-click **Replay** of the exact invocation; successful runs store no customer data. A broken task is fixed conversationally with **AI optimize** (plain-English → validated structured patch → version auto-bump), run as a background job. Each task carries a **verified / unverified / error** health signal anchored on the last optimize; a broken task is highlighted in admin and hidden from users until re-verified.
 
 ## 4. Heterogeneity & multi-tenant
 
-The schema is surface-agnostic: `action` is a small typed vocabulary and `target.strategy` is the only place a surface leaks in, so a desktop driver or a legacy frameset app is a new *strategy*, not a rewrite. Recording intent + locator strategy (not coordinates) means one tenant's artifact applies to a differently-branded instance of the same app. Known boundary: canvas/image-only surfaces need coordinate clicking — `visual` is reserved but not built, since the targets are DOM-based.
+The schema is surface-agnostic: `action` is a small typed vocabulary and `target.strategy` is the only place a surface leaks in, so a legacy table-based portal, an outdated frameset, or a modern SPA is a new *strategy*, not a rewrite. A reserved `visual` (coordinate) strategy exists for future image/canvas surfaces but is unbuilt — the current targets are DOM-based.
 
-**Multi-tenant reuse is the core of the product.** The artifact (the *how*) is shared; the *inputs* and *credentials* are per-user. Concretely: each user owns a private folder; the legacy credential is injected from it (decrypted only at the moment of use, under a per-user key `SHA-256(master ‖ user_id)`), and inputs bound to per-user data are auto-fetched. So one institution's artifact runs safely for many employees without any shared service account or hard-coded customer data.
+**Multi-tenant reuse is the core product design.** The artifact (the *how*) is shared; the *credentials and inputs* (the *whose*) are per-user. Each user owns a private folder; credentials decrypt only at the moment of use under a per-user AES-256-GCM key (`SHA-256(master ‖ user_id)`); bound identity fields (employee id, member id) are auto-resolved from private state. No shared service accounts, no hard-coded customer data, no cross-user leakage. One verified artifact runs safely across many employees and many branded instances of the same app.
 
 ## 5. Escalation & handoff
 
-A real control-transfer state machine on the same live session: `AUTOMATION → PAUSED → HUMAN → (resume)`. The system detects a blocked or hard-failed state, hands the live browser session to a human operator, and resumes where it paused while recording the human's actions — so it can always answer "who is in control," and a human can steer an edge case without aborting the flow.
+The system has a real **control-transfer state machine** — `AUTOMATION → PAUSED → HUMAN → resume` — that tracks who is in control of a live session and records each transfer (pause / cede / resume) with its reason. On a hard failure the automation pauses itself, and the state machine answers "who is in control" at every point.
+
+The **operator UI** — where a human actually drives the live session to resolve an edge case — is stubbed at a clean seam: the `cede`/`resume` transitions and the event history are real, but the interactive human-take-over loop is a documented cut (see §7), not a built UI.
 
 ## 6. Safety
 
-Three layers: an **allowlist** (domains + action types, enforced in discovery *and* replay, so the model can't wander off-site even during authoring); **action gating** (risky/irreversible actions blocked or escalated); and **data handling** (inputs AES-256-GCM encrypted at rest with per-tenant/per-user keys, decrypted only at the moment of use, never revealed in the report — successful runs store no customer data). The explicit threat model is **accidental mis-action, not a determined adversary**: the guardrails bound the blast radius of a wrong model decision; they are not a security boundary against an attacker who controls the host.
+Guardrails bound the blast radius of a wrong model decision or a bad artifact edit; the threat model is **accidental mis-action, not a determined adversary**.
+
+- **Allowlist** (active) — approved domains and action types are enforced in both discovery and replay, so the model can't navigate off-domain or act outside the vocabulary even during authoring.
+- **Data handling** (active) — sensitive inputs are AES-256-GCM encrypted at rest with per-tenant/per-user keys and decrypted only at the moment of use; successful runs persist no customer data.
+- **Action gating** (seam, not active) — the policy schema has a `risky_actions` list for blocking/escalating irreversible actions, but it is currently empty and not wired; it's a defined extension point, not current behavior.
 
 ## 7. Cuts
 
-Depth over breadth, applied to the load-bearing pieces (artifact schema, deterministic replay + error handling, safety/escalation). Deliberately cut, each with a real seam:
+Depth over breadth, applied to the load-bearing pieces (artifact schema, deterministic replay, safety, isolation, escalation). Deliberately cut, each with a real seam:
 
-- **No queue/cluster/pooling** — synchronous single-process replay is simpler and sufficient to prove correctness; the `/api/run` boundary is where a worker pool would attach (§1).
-- **No coordinate clicking / desktop driver** — `visual` strategy and the `desktop` surface are typed into the schema but unbuilt, since the target apps are DOM-based.
-- **No commercial production target** — proven against a deliberately-hostile local mock (1998-era banking portal: table-based layouts, no test IDs, multi-modal outcomes per input) plus the public SauceDemo / The Internet sandboxes, never real credentials or PII.
+- **No queue/cluster/browser-pooling** — synchronous single-process replay proves correctness; the `/api/run` boundary is where a worker pool would attach.
+- **No coordinate clicking / desktop driver** — the `visual` strategy and the `desktop` surface are typed into the schema but unbuilt.
+- **No interactive operator UI** — the handoff state machine is real; the human-drives-the-live-session loop is stubbed (see §5).
+- **No commercial production target** — proven against a deliberately-hostile local mock (1998-era banking portal: table layouts, no test IDs, multi-modal outcomes) plus the public SauceDemo / The Internet sandboxes; never real credentials or PII.
 
-With more time, next: capability dedup (one flow, many recordings), automatic error-state discovery (probe the failure paths during authoring), generalized output extraction, and the queue/browser-pool layer for multi-tenant scale.
+Next, with more time: capability dedup, automatic error-state discovery, generalized output extraction, and the queue/browser-pool layer for multi-tenant scale.
 
 ---
 
-See **[README.md](README.md)** for the full runbook — install, demo path, the mock's multi-modal inputs, the per-user login/credential model, input binding, and the statistics / AI-optimize loop in detail.
+See **[README.md](README.md)** for the full runbook — install, demo path, the mock's multi-modal inputs, the per-user login/credential model, input binding, and the statistics / AI-optimize loop.
