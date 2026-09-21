@@ -18,10 +18,6 @@ artifacts/
 
 # Evidence is deliberately committed (it's a deliverable) — do not ignore.
 
-# NOTE: Chinese mirror docs (*.zh.md) are temporarily committed for the
-# author's convenience (remote reading on the go). Re-add "*.zh.md" here and
-# remove them from the repo before final submission.
-
 # IDE
 .idea/
 

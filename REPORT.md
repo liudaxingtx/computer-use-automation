@@ -1,6 +1,6 @@
 # REPORT — Computer-Use Automation System
 
-> Final submission write-up. Distilled from `DESIGN.md`; the implementation is complete through Phase 6 and backed by real runs under `/evidence/`.
+> Final submission write-up. The implementation is complete and backed by real runs under `/evidence/`.
 
 ## 1. Architecture
 

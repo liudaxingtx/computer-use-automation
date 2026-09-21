@@ -6,7 +6,7 @@ run: *what* to do (steps), *how to point at* each control (locator strategy),
 (error handling). It is deliberately decoupled from the raw LLM transcript —
 replay (Phase 4) consumes this, never the model's monologue.
 
-Design principles (see DESIGN.md §5):
+Design principles (see README §3.1):
   1. Intent, not coordinates — we record *how to locate* a control, never pixels.
   2. Decoupled from the transcript — distilled, typed steps, human-reviewable.
   3. Every step carries an assertion — we never assume a click worked.

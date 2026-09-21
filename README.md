@@ -4,135 +4,175 @@
 
 An LLM-driven system that gives AI agents hands on legacy software that has **no API**: it *discovers* how to operate a UI, *records* the successful run as a structured artifact, and *replays* it deterministically — **no LLM in the loop** — so an agent can invoke it reliably and cheaply in production.
 
----
-
-## The problem → the solution
-
-interface.ai's agents must operate back-office systems (bank, insurance, healthcare) whose only interface is a web UI. That means driving the browser like a human. The naive way — ask a model at every click — is slow, expensive, and non-deterministic.
-
-This system inverts that:
-
-```
-        discovery (LLM, once)                 replay (deterministic, forever)
-  ┌─────────────────────────────┐         ┌─────────────────────────────────┐
-  │ observe → decide → act      │  distill │ act → assert → branch          │
-  │ (a live browser session)    │ ───────► │ (a typed Capability artifact)  │
-  └─────────────────────────────┘          └─────────────────────────────────┘
-          "how do I do this?"                  "do this, with these inputs"
-```
-
-**The model discovers. The artifact replays.** The LLM appears exactly once — during discovery. What it learned becomes a *Capability*: a versioned, reviewable record of *what* to do, *how to locate* each control, and *what to expect* after each step. Production invocations replay that artifact with plain deterministic code — no model, no reasoning, no cost.
+The whole project is three blocks: a **core engine** (discover → record → replay), an **admin console** (manage and create tasks), and a **user-facing runner** (use tasks). This README is the single source of truth; the formal submission write-up lives in [`REPORT.md`](REPORT.md).
 
 ---
 
-## Quick start
+## 1. Installation & Usage
+
+### 1.1 Requirements
+
+- Python 3.12
+- Network access to the target sites (for the two live demo sites)
+
+### 1.2 Install
 
 ```bash
-# 1. Install (Python 3.12)
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
+```
 
-# 2. Configure API keys (optional — only needed to *record new* tasks)
-cp .env.example .env      # fill in DECISION_LLM_API_KEY and VISION_LLM_API_KEY
+### 1.3 Configure
 
-# 3. Start the local target app (a "legacy bank" mock, port 9000)
+```bash
+cp .env.example .env      # fill in the two API keys (optional — see below)
+```
+
+There are two LLM roles, both **provider-agnostic** — point each at any OpenAI-compatible endpoint (DeepSeek, Kimi/Moonshot, OpenAI, OpenRouter, a local vLLM, …). See `.env.example` for a multi-provider template.
+
+> **You only need keys to *record new* tasks.** Viewing and replaying the pre-recorded tasks needs **no keys at all** — replay is deterministic, no LLM in the loop.
+
+### 1.4 Run
+
+```bash
+# start the local target app (a "legacy bank" mock, port 9000)
 python3 mock-app/server.py
 
-# 4. Start the dashboard (port 8123)
+# start the dashboard (port 8123) — serves BOTH interfaces
 .venv/bin/python -m dashboard.server
-
-# 5. Open http://localhost:8123
 ```
 
-You'll see a dashboard of pre-recorded tasks grouped by target site, each invokable with your own inputs. **Viewing and replaying the pre-recorded tasks needs no API keys** — replay is deterministic, no LLM in the loop. Keys are only required to record *new* tasks. Full walkthrough: **[`GETTING_STARTED.md`](GETTING_STARTED.md)**.
+Then open:
 
----
-
-## The demo — seven recorded tasks
-
-The engine is proven against **two kinds of target**: a deliberately-hostile local mock *and* two live, publicly-deployed test sites.
-
-| Site | Task | What it does |
+| URL | Who it's for | What it does |
 |---|---|---|
-| **Local mock** (`localhost:9000`) | `lookup_member` | search a member by ID and read their detail |
-| | `deactivate_member` | search → view detail → deactivate an account |
-| | `register_operator` | fill and submit the registration form |
-| | `login_operator` | fill and submit the login form |
-| **SauceDemo** (real site) | `saucedemo_login` | log into the Swag Labs store |
-| | `saucedemo_checkout` | **login → add-to-cart → cart → checkout → finish an order** (11 steps) |
-| **The Internet** (real site) | `theinternet_login` | log into the Secure Area |
+| `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, call log, delete, register new tasks |
+| `http://localhost:8123/user` | **User runner** | Pick a task from a dropdown → fill its inputs → run → see the result |
 
-`saucedemo_checkout` is the headline: a full multi-step transactional flow discovered and replayed against a **live React storefront** — which forced two real-world fixes that a mock never would have (see below).
-
----
-
-## How it works
-
-1. **Discover** — the decision LLM is shown a live browser (URL + accessibility tree + a numbered menu of controls) and decides one action at a time. Image-only surfaces fall back to a vision model.
-2. **Record** — the successful transcript is distilled into a `Capability`: typed steps, locator *strategies* (role+name, never pixels), per-step assertions, and first-class error states.
-3. **Replay** — a deterministic engine re-runs the artifact: it re-resolves each locator against the live page, acts, then classifies the result into one of **three states**:
-   - **success** — goal reached, structured outputs extracted from the page;
-   - **business_outcome** — a legitimate answer ("no such member"), not a crash;
-   - **failure** — a hard stop with a debuggable diagnostic.
-
-The three-state taxonomy is the heart of the design: "no such member" is a *valid answer*, not an error. It's proven against a mock that plants exactly these traps.
-
----
-
-## Repository layout
-
-```
-agent/        discovery loop · artifact model · deterministic replay · safety · crypto · observability
-dashboard/    the task-management console (served at http://localhost:8123)
-mock-app/     a deliberately-hostile local stand-in for a legacy bank back-office app
-evidence/     artifacts + logs from real discovery and replay runs (append-only)
-scripts/      one-command tests, screenshot/evidence generators, artifact helpers
-```
-
----
-
-## Features
-
-- **Discovery loop** — accessibility-tree observation + vision fallback + structured LLM decisions.
-- **Typed artifact** — a versioned, human-reviewable `Capability` (diffable JSON, not a model monologue).
-- **Deterministic replay** — act → assert → branch, with bounded retries and hard-stop escalation.
-- **Structured data extraction** — on success, the result page is read back into JSON (normalized field matching).
-- **One-click recording** — give a URL + a plain-English sentence, get a recorded + verified task back (`POST /api/discover`).
-- **Observability** — append-only run store, success telemetry, a failure inbox, and a replay-error → repair → re-verify loop.
-- **Safety** — action allowlist (enforced in discovery *and* replay), AES-256-GCM encryption of customer inputs at rest, and a human handoff state machine.
-- **Task dashboard** — grouped by domain, per-task locator detail + screenshots, Swagger-style invoke, call log, delete (with confirm).
-- **User-facing Task Runner** — a minimal end-user page (`/user`): pick a task from a domain-grouped dropdown, see its input params (name + meaning + type, passwords masked), run it, and read the three-state result with extracted data.
-
----
-
-## Testing
+### 1.5 Test suite
 
 ```bash
 ./scripts/run_tests.sh
 ```
 
-Boots the mock and runs the real end-to-end suite: discovery → artifact → replay across all three states → safety/encryption/handoff → vision fallback → observability. It makes **real LLM calls** — that's the point: a genuine run, not a stubbed result.
+Boots the mock and runs the real end-to-end suite (discovery → artifact → replay across all three states → safety/encryption/handoff → vision fallback → observability). It makes **real LLM calls** — a genuine run, not a stub.
 
 ---
 
-## Design highlights
+## 2. Project Structure
 
-The reasoning behind every decision is in [`DESIGN.md`](DESIGN.md). A few worth calling out:
+### 2.1 The three blocks
 
-- **Intent, not coordinates** — artifacts record *how to locate* a control (role + name), so one recorded on institution A applies to differently-branded institution B.
-- **Every step asserts** — a click's success is never assumed.
-- **Repeated-control disambiguation** — a real storefront has six identical "Add to cart" buttons; locators record their position *within* the name group so replay targets the right one.
-- **Async-render (SPA) waiting** — real sites render results after navigation; replay polls for the success signal before judging failure.
-- **Reasoning-model output drift** — the decision model's reasoning monologue can consume the output budget; a generous budget + `reasoning_content` fallback + retry makes drift self-heal.
+```
+                 ┌───────────────────────────────────────────────┐
+                 │  ENGINE  (agent/)                             │
+                 │                                               │
+   new task  ──► │  DISCOVERY (LLM, once)   observe→decide→act   │
+                 │       │                                       │
+                 │       ▼  distills to a Capability artifact    │
+                 │  REPLAY   (deterministic, forever)            │
+                 │       act→assert→branch,  three-state result  │
+                 └───────────────┬───────────────────────────────┘
+                                 │
+          ┌──────────────────────┴──────────────────────┐
+          │                                             │
+   ┌──────▼───────┐                            ┌────────▼────────┐
+   │ ADMIN console │  (/)                      │ USER runner    │ (/user)
+   │ manage + create │                          │ just use tasks │
+   └──────────────┘                            └─────────────────┘
+```
+
+Both interfaces are thin HTTP frontends over the **same** engine and the same `POST /api/run` replay endpoint. They differ only in what they expose: the admin console adds create/delete/monitor, the user runner strips all of that down to "pick → fill → run → result".
+
+### 2.2 Directory layout
+
+```
+agent/        the engine — discovery loop, artifact model, deterministic replay,
+              safety, encryption, observability
+dashboard/    both web interfaces — server.py, index.html (admin), user.html (runner),
+              screenshots/
+mock-app/     a deliberately-hostile local stand-in for a legacy bank back-office app
+evidence/     committed deliverables — capabilities, raw discovery transcripts,
+              append-only run logs (inputs encrypted at rest)
+scripts/      one-command tests, screenshot/evidence generators, artifact helpers
+artifacts/    runtime capability store (git-ignored working directory)
+```
+
+### 2.3 The data flow
+
+1. **Discover** — the decision LLM is shown a live browser (URL + accessibility tree + a numbered control menu) and decides one action at a time. Image-only surfaces fall back to a vision model.
+2. **Record** — the successful transcript is distilled into a `Capability`: typed steps, locator *strategies* (role+name, never pixels), per-step assertions, first-class error states.
+3. **Replay** — a deterministic engine re-runs the artifact: it re-resolves each locator against the live page, acts, then classifies the result into one of **three states** (`success` / `business_outcome` / `failure`).
 
 ---
 
-## Documentation
+## 3. Design Features
 
-| Doc | For |
-|---|---|
-| **[`GETTING_STARTED.md`](GETTING_STARTED.md)** | Run it, configure it, verify it, see what was built and what was deliberately cut |
-| [`REPORT.md`](REPORT.md) | The formal submission write-up (the seven mandated headings) |
-| [`DESIGN.md`](DESIGN.md) | The full working design record — the reasoning behind every decision |
-| [`TODO.md`](TODO.md) | Progress tracker |
+### 3.1 Core principles
+
+- **The model discovers; the artifact replays.** The LLM appears exactly once, during discovery. Production runs never pay for a model.
+- **Three-state result contract.** "no such member" is a *business_outcome* (a valid answer), not a *failure* — a hard stop is distinct from a legitimate answer.
+- **Intent, not coordinates.** Artifacts record *how to locate* a control (role + name), so one recorded on institution A applies to differently-branded institution B.
+- **Every step asserts.** A click's success is never assumed; each step declares what it expects.
+- **Repeated-control disambiguation.** A real storefront has six identical "Add to cart" buttons; locators record their position *within* the name group (`name_ordinal`).
+- **Async-render (SPA) waiting.** Real sites render results after navigation; replay polls for the success signal before judging failure.
+- **Reasoning-model output drift.** Reasoning LLMs spend most of their budget on a monologue and can return empty `content`; a generous budget + `reasoning_content` fallback + retry makes that self-heal.
+
+### 3.2 Real-time statistics & monitoring
+
+Every invocation is **recorded, measured, and re-runnable**:
+
+- **Append-only run store.** Each replay is one JSON file under `evidence/runs/`, keyed by task + timestamp + result — nothing is ever overwritten.
+- **Real-time rates.** The telemetry layer aggregates, per task + version: `success`, `business_outcome`, `failure` counts and their **rates** (`success_rate`, `business_rate`, **`failure_rate`**). So yes — if a task starts erroring, the error rate is visible immediately.
+- **Failure inbox.** Every non-success run lands in an unresolved-failures inbox; a maintainer marks them resolved after a fix.
+- **Replay-the-error loop.** Any failure can be re-run deterministically with its exact original inputs to reproduce and verify a fix.
+- **Call log (admin console).** A live view of every invocation: how many times each task ran, whether it succeeded, and the exact inputs used — including failures.
+
+### 3.3 Privacy & encryption
+
+Customer-entered values are treated as secrets end to end:
+
+- **AES-256-GCM encryption at rest.** Every input value is encrypted *before* it touches disk; the run log and artifacts never store plaintext customer data.
+- **Decrypt only at the moment of use.** Replay decrypts an input solely to type it into the target form, then it is gone.
+- **Per-tenant keys.** The master key derives a separate key per tenant (`SHA-256(master ‖ tenant)`), so one tenant's data is unreadable with another's key.
+- **Authenticated encryption.** Wrong key or tampering raises — ciphertext can't silently decrypt to garbage.
+- **Key never committed.** The master key lives in the environment (or a KMS in production), never in the repo.
+- **Structure vs. data.** The locator strategy (UI structure) stays plaintext so artifacts remain reviewable; only the customer *data* is ciphertext.
+- **Safety allowlist + human handoff.** Actions are allowlisted in both discovery and replay; a hard failure pauses to a human operator who can resume the live session.
+
+### 3.4 Known limitations & concrete solutions
+
+These are deliberate, honest scoping decisions — each with a concrete path to implement, not a blind gap.
+
+**Relative-position / coordinate clicking (the big one).**
+Some legacy surfaces are canvas- or image-only: no DOM, no accessibility tree, so nothing can be located by role+name. Today the vision fallback *describes* such screens (including a recommended click point), but there is no "click at coordinates" action, so we can't actually drive them. The concrete plan:
+
+1. The `visual` locator strategy is **already reserved** in the schema — extend the action vocabulary with a coordinate click (`click_at`).
+2. **Record relative, not absolute.** During discovery, store the click point as an offset from a detected *landmark* (e.g. "the CONTINUE button center, relative to the page's bounding box") — never raw pixels, which break on any viewport/resolution change.
+3. **Re-locate at replay time.** Re-run the vision model on the current screenshot to re-find the landmark and re-compute the click point, then `page.mouse.click(x, y)`. This makes it robust to resize, scroll, and different screens.
+4. **Guard it.** Coordinate clicking is inherently less reliable than semantic locators, so it's an explicit, flagged per-step fallback that re-asserts after the click and escalates to a human on mismatch.
+
+The honest tradeoff: this re-introduces a vision model into the replay path for *those specific steps* (bending the "no LLM in replay" invariant), which is why it's opt-in and kept out of the common path — and why we reserved it but haven't built it yet: the target back-office apps are DOM-based, so it's a rare fallback whose full cost (relative anchoring + re-location) didn't pay off for the mock/sauce-demo targets.
+
+**Other scoped-out items (with known paths):**
+- **Capability deduplication** — collapse "same flow, different parameter" into one task via a flow fingerprint.
+- **Automatic error-state discovery** — a negative-testing pass to discover `business_outcome`/`failure` signals automatically (today they're patched in).
+- **Generalized output extraction** — extend extraction beyond key-value tables to free-text result pages.
+- **Multi-tenant / queue / cluster plumbing** — deliberately omitted; the depth went into the artifact schema, the error taxonomy, and handoff.
+- **General commercial sites** — scoped to automation-friendly test sites (SauceDemo, The Internet); general sites sit behind ToS, CAPTCHAs, and WAFs that are out of scope.
+
+---
+
+## 4. Summary
+
+This project answers one question: **how does an AI agent operate a system that has no API?** The answer is a design, not a Playwright wrapper:
+
+- The **model discovers once** — it learns a task by driving a real browser, then leaves the loop.
+- The **artifact replays forever** — what it learned is distilled into a typed, reviewable capability that deterministic code re-runs cheaply and reliably.
+- **Errors are first-class** — a three-state result (success / business-outcome / failure) plus telemetry, a failure inbox, and a repair loop turn "the automation broke" into "here's the failing run, reproduce it, fix it, re-verify it."
+- **Customer data is a secret** — AES-256-GCM, per-tenant keys, encrypt-at-rest / decrypt-at-use, and a human handoff for hard failures.
+
+It's proven against two kinds of target: a deliberately-hostile local mock *and* two live, publicly-deployed sites. Seven recorded tasks span three domains (local mock, SauceDemo, The Internet), all verified — including an 11-step checkout flow against a live React storefront that forced three real-world fixes (repeated-control disambiguation, SPA async-render waiting, reasoning-model output drift).
+
+The key win: separating *discovery* from *replay* is what makes this a design rather than "a model that clicks around" — production runs never pay for an LLM, and every run is deterministic, observable, and private.

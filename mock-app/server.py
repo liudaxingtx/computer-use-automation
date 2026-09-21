@@ -16,7 +16,7 @@ Routes (all GET, like a real legacy app):
   /deactivate?member_id=...       confirmation interstitial
   /do_deactivate?member_id=...    result (success | access denied)
 
-Planted runtime states (the whole point — see DESIGN.md §6):
+Planted runtime states (the whole point — see README §3.1):
   - "NO SUCH MEMBER"   -> a legitimate BUSINESS OUTCOME, not a crash
   - confirmation page  -> a RECOVERABLE condition (dismiss or confirm)
   - "ACCESS DENIED"    -> a HARD FAILURE (member 1002 is RESTRICTED)
