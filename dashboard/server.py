@@ -390,6 +390,15 @@ def _stats_json() -> dict:
     }
 
 
+def _bump_version(v: str) -> str:
+    """Patch-bump a semver string (1.0.0 -> 1.0.1). Non-semver is left untouched."""
+    parts = (v or "").split(".")
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        return v
+    major, minor, patch = (int(p) for p in parts)
+    return f"{major}.{minor}.{patch + 1}"
+
+
 def _optimize_task(name: str, instruction: str) -> dict:
     """AI-assisted artifact tuning. Pass the current artifact + a maintainer's
     natural-language instruction to the decision LLM, which returns a structured
@@ -433,6 +442,13 @@ def _optimize_task(name: str, instruction: str) -> dict:
         "- outputs[].extract must be a real CSS selector (e.g. \"h2\", \"#flash\", \".title\") "
         "whenever the value is read from a specific element; leave it \"\" only for key-value "
         "table extraction where label matches the on-page field.\n"
+        "- Outputs must reflect what the result page ACTUALLY shows. When the result page is "
+        "plain text (no <table>) — e.g. a success message rendered in <font>/<b> tags — use a "
+        "real CSS selector in extract (e.g. \"font b\" for the headline, \"font[size=2]\" for a "
+        "message line) instead of relying on table extraction, which silently yields null.\n"
+        "- Never declare an output the page does not echo back. If a result page does not "
+        "re-display a field (e.g. a password or email the form accepted but the page does not "
+        "show again), drop it from outputs rather than leaving it to extract as null.\n"
         "- checkpoint_text must be literal text that appears on the page on success.\n"
         "- business_outcomes are legitimate expected answers (e.g. \"no such member\"); "
         "failure_patterns are hard errors (e.g. \"access denied\").\n"
@@ -473,13 +489,18 @@ def _optimize_task(name: str, instruction: str) -> dict:
                 "explanation": explanation}
     # Optimizing changes the solution path, so any prior verified/error status is
     # reset: record optimized_at and let status be re-earned by fresh runs.
+    # Every optimize also patch-bumps the version so a fixed task is a new,
+    # distinguishable artifact (1.0.0 -> 1.0.1) — callers and the run log can
+    # tell which version a run executed against.
     from datetime import datetime, timezone
     new_cap.meta.optimized_at = datetime.now(timezone.utc)
+    new_cap.meta.version = _bump_version(new_cap.meta.version)
     (ARTIFACT_DIR / f"{name}.json").write_text(new_cap.model_dump_json(indent=2))
 
     return {
         "ok": True,
         "name": name,
+        "version": new_cap.meta.version,
         "explanation": explanation,
         "changed": list(patch.keys()),
         "outputs": [o.model_dump() for o in new_cap.outputs],
