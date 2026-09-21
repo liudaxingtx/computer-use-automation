@@ -48,6 +48,36 @@
     }
   ],
   "failure_patterns": [],
+  "examples": [
+    {
+      "inputs": {
+        "member_id": "1001"
+      },
+      "result": "success",
+      "note": "JOHN SMITH · ACTIVE · $4,250.00"
+    },
+    {
+      "inputs": {
+        "member_id": "1002"
+      },
+      "result": "success",
+      "note": "JANE DOE · RESTRICTED · $12.80"
+    },
+    {
+      "inputs": {
+        "member_id": "1003"
+      },
+      "result": "success",
+      "note": "ROBERT CHEN · ACTIVE · $18,900.00"
+    },
+    {
+      "inputs": {
+        "member_id": "9999"
+      },
+      "result": "business_outcome",
+      "note": "NO SUCH MEMBER"
+    }
+  ],
   "steps": [
     {
       "action": "type",

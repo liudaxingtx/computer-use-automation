@@ -75,6 +75,44 @@
     }
   ],
   "failure_patterns": [],
+  "examples": [
+    {
+      "inputs": {
+        "username": "testop",
+        "password": "secret99",
+        "email": "testop@example.com"
+      },
+      "result": "success",
+      "note": "REGISTRATION SUCCESS \u2014 use a fresh username (restart mock to reset if already taken)"
+    },
+    {
+      "inputs": {
+        "username": "admin",
+        "password": "secret99",
+        "email": "a@x.com"
+      },
+      "result": "business_outcome",
+      "note": "USERNAME TAKEN \u2014 admin already exists"
+    },
+    {
+      "inputs": {
+        "username": "pwtest",
+        "password": "abc",
+        "email": "pwtest@example.com"
+      },
+      "result": "business_outcome",
+      "note": "INVALID PASSWORD \u2014 shorter than 6 chars"
+    },
+    {
+      "inputs": {
+        "username": "",
+        "password": "secret99",
+        "email": "x@x.com"
+      },
+      "result": "business_outcome",
+      "note": "INVALID INPUT \u2014 username is required"
+    }
+  ],
   "steps": [
     {
       "action": "type",

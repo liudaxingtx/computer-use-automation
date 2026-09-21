@@ -75,6 +75,14 @@ class OutcomePattern(BaseModel):
     label: str = ""    # human-readable meaning, e.g. "member not found"
 
 
+class Example(BaseModel):
+    """A concrete, runnable example: these inputs produce this result, so a
+    tester can follow the list to verify the task behaves as recorded."""
+    inputs: dict = {}   # concrete input values (keys match the input specs)
+    result: str = ""    # success | business_outcome | failure
+    note: str = ""      # what the tester should see, e.g. "JOHN SMITH · ACTIVE"
+
+
 class CapabilityMeta(BaseModel):
     name: str
     version: str = "1.0.0"
@@ -82,6 +90,7 @@ class CapabilityMeta(BaseModel):
     surface: Literal["browser", "desktop"] = "browser"
     domain: str = ""        # primary domain of the target system (e.g. "bank-a.com") — groups tasks per site
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    optimized_at: Optional[datetime] = None   # last AI-optimize time; resets verified → unverified
 
 
 class Capability(BaseModel):
@@ -94,6 +103,7 @@ class Capability(BaseModel):
     checkpoint_text: str = ""                   # deterministic success signal (page text contains this)
     business_outcomes: list[OutcomePattern] = []   # "no such member" — a legitimate answer
     failure_patterns: list[OutcomePattern] = []    # "access denied" — a hard stop
+    examples: list[Example] = []                   # runnable input→result examples for testers
     steps: list[Step]
 
 
@@ -113,6 +123,7 @@ def serialize(
     tenant_id: str = "default",
     domain: str = "",
     start_url: str = "",
+    examples: Optional[list[dict]] = None,
 ) -> Capability:
     """Distill a discovery run into a Capability.
 
@@ -174,6 +185,7 @@ def serialize(
         checkpoint_text=checkpoint_text,
         business_outcomes=[OutcomePattern(**o) for o in (business_outcomes or [])],
         failure_patterns=[OutcomePattern(**o) for o in (failure_patterns or [])],
+        examples=[Example(**e) for e in (examples or [])],
         steps=steps,
     )
 

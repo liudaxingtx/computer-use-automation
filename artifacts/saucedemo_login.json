@@ -13,13 +13,13 @@
       "name": "user-name",
       "type": "str",
       "required": true,
-      "description": "Store username — e.g. standard_user"
+      "description": "Store username \u2014 e.g. standard_user"
     },
     {
       "name": "password",
       "type": "password",
       "required": true,
-      "description": "Store password — e.g. secret_sauce"
+      "description": "Store password \u2014 e.g. secret_sauce"
     }
   ],
   "outputs": [],
@@ -32,6 +32,24 @@
     }
   ],
   "failure_patterns": [],
+  "examples": [
+    {
+      "inputs": {
+        "user-name": "standard_user",
+        "password": "secret_sauce"
+      },
+      "result": "success",
+      "note": "Products page (Sauce Labs Backpack)"
+    },
+    {
+      "inputs": {
+        "user-name": "standard_user",
+        "password": "wrong_password"
+      },
+      "result": "business_outcome",
+      "note": "Epic sadface \u2014 invalid credentials"
+    }
+  ],
   "steps": [
     {
       "action": "type",

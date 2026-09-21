@@ -47,6 +47,24 @@
     }
   ],
   "failure_patterns": [],
+  "examples": [
+    {
+      "inputs": {
+        "username": "admin",
+        "password": "secret123"
+      },
+      "result": "success",
+      "note": "LOGIN SUCCESS"
+    },
+    {
+      "inputs": {
+        "username": "admin",
+        "password": "wrongpass"
+      },
+      "result": "business_outcome",
+      "note": "INVALID CREDENTIALS"
+    }
+  ],
   "steps": [
     {
       "action": "type",

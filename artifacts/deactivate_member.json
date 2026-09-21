@@ -13,7 +13,7 @@
       "name": "member_id",
       "type": "str",
       "required": true,
-      "description": "Member account ID to deactivate — e.g. 1001"
+      "description": "Member account ID to deactivate \u2014 e.g. 1001"
     }
   ],
   "outputs": [],
@@ -30,6 +30,36 @@
     }
   ],
   "failure_patterns": [],
+  "examples": [
+    {
+      "inputs": {
+        "member_id": "1001"
+      },
+      "result": "success",
+      "note": "SUCCESS \u2014 JOHN SMITH deactivated"
+    },
+    {
+      "inputs": {
+        "member_id": "1003"
+      },
+      "result": "success",
+      "note": "SUCCESS \u2014 ROBERT CHEN deactivated"
+    },
+    {
+      "inputs": {
+        "member_id": "1002"
+      },
+      "result": "business_outcome",
+      "note": "ACCESS DENIED \u2014 JANE DOE is RESTRICTED"
+    },
+    {
+      "inputs": {
+        "member_id": "9999"
+      },
+      "result": "business_outcome",
+      "note": "NO SUCH MEMBER"
+    }
+  ],
   "steps": [
     {
       "action": "type",

@@ -150,7 +150,7 @@ let TASKS = [];
 async function loadTasks() {
   const res = await fetch('/api/tasks');
   const data = await res.json();
-  TASKS = data.tasks || [];
+  TASKS = (data.tasks || []).filter(t => t.status !== 'error');  // hide broken tasks from users
 
   // group by domain for the dropdown
   const byDomain = {};

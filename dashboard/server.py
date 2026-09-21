@@ -112,8 +112,34 @@ def _run_stats(name: str) -> dict:
     return stats
 
 
+def _task_status(cap) -> str:
+    """verified / unverified / error, judged only by runs since the last optimize.
+
+    - error:      any failure (no JSON feedback) since the last optimize — broken.
+    - verified:   at least one success since the last optimize.
+    - unverified: no success and no failure since the last optimize (just optimized).
+    """
+    optimized_at = cap.meta.optimized_at or cap.meta.created_at
+    has_success = has_failure = False
+    for run in ReplayStore().list_runs():
+        if run.capability != cap.meta.name:
+            continue
+        if run.started_at <= optimized_at:
+            continue
+        if run.result == "failure":
+            has_failure = True
+        elif run.result == "success":
+            has_success = True
+    if has_failure:
+        return "error"
+    if has_success:
+        return "verified"
+    return "unverified"
+
+
 def _task_summary(cap) -> dict:
     stats = _run_stats(cap.meta.name)
+    status = _task_status(cap)
     return {
         "name": cap.meta.name,
         "version": cap.meta.version,
@@ -121,7 +147,8 @@ def _task_summary(cap) -> dict:
         "domain": cap.meta.domain,
         "steps_count": len(cap.steps),
         "inputs": [i.model_dump() for i in cap.inputs],
-        "verified": stats["success"] > 0,
+        "status": status,
+        "verified": status == "verified",
         "runs": stats,
     }
 
@@ -148,6 +175,7 @@ def _task_detail(cap) -> dict:
         "checkpoint_text": cap.checkpoint_text,
         "business_outcomes": [b.model_dump() for b in cap.business_outcomes],
         "failure_patterns": [f.model_dump() for f in cap.failure_patterns],
+        "examples": [e.model_dump() for e in cap.examples],
         "steps": steps,
         "screenshots": [
             {"id": pid, "label": label, "url": f"/api/screenshots/{pid}.png"}
@@ -181,7 +209,7 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
         "result": run.result,
         "diagnostic": run.diagnostic,
         "outputs": run.outputs,
-        "screenshot": f"/api/screenshots/{shot}",
+        "screenshot": f"/api/screenshots/{shot}?t={int(time.time() * 1000)}",
         "steps": run.steps,
         "inputs": inputs if echo_inputs else None,
         "duration_ms": run.duration_ms,
@@ -409,6 +437,10 @@ def _optimize_task(name: str, instruction: str) -> dict:
     except Exception as e:  # noqa: BLE001 — surface an invalid AI patch, don't crash
         return {"ok": False, "error": f"AI returned an invalid patch: {e}",
                 "explanation": explanation}
+    # Optimizing changes the solution path, so any prior verified/error status is
+    # reset: record optimized_at and let status be re-earned by fresh runs.
+    from datetime import datetime, timezone
+    new_cap.meta.optimized_at = datetime.now(timezone.utc)
     (ARTIFACT_DIR / f"{name}.json").write_text(new_cap.model_dump_json(indent=2))
 
     return {
@@ -625,8 +657,9 @@ def build_tasks() -> dict:
         "tasks": tasks,
         "summary": {
             "total": len(tasks),
-            "verified": sum(1 for t in tasks if t["verified"]),
-            "unverified": sum(1 for t in tasks if not t["verified"]),
+            "verified": sum(1 for t in tasks if t["status"] == "verified"),
+            "unverified": sum(1 for t in tasks if t["status"] == "unverified"),
+            "error": sum(1 for t in tasks if t["status"] == "error"),
         },
     }
 
@@ -677,7 +710,15 @@ class Handler(BaseHTTPRequestHandler):
             rel = unquote(path[len("/api/screenshots/"):])
             fp = (SHOTS / rel).resolve()
             if str(fp).startswith(str(SHOTS.resolve())) and fp.is_file():
-                self._send(fp.read_bytes(), "image/png")
+                body = fp.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(body)))
+                # Screenshots are overwritten per run (fixed filename); forbid
+                # caching so a re-run shows the fresh image, not a stale one.
+                self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+                self.end_headers()
+                self.wfile.write(body)
             else:
                 self._json({"error": "not found"}, 404)
         else:

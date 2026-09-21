@@ -13,7 +13,7 @@
       "name": "username",
       "type": "str",
       "required": true,
-      "description": "Login username — e.g. tomsmith"
+      "description": "Login username \u2014 e.g. tomsmith"
     },
     {
       "name": "password",
@@ -51,6 +51,32 @@
     }
   ],
   "failure_patterns": [],
+  "examples": [
+    {
+      "inputs": {
+        "username": "tomsmith",
+        "password": "SuperSecretPassword!"
+      },
+      "result": "success",
+      "note": "Secure Area"
+    },
+    {
+      "inputs": {
+        "username": "wronguser",
+        "password": "SuperSecretPassword!"
+      },
+      "result": "business_outcome",
+      "note": "Your username is invalid"
+    },
+    {
+      "inputs": {
+        "username": "tomsmith",
+        "password": "wrongpass"
+      },
+      "result": "business_outcome",
+      "note": "Your password is invalid"
+    }
+  ],
   "steps": [
     {
       "action": "type",

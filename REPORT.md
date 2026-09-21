@@ -48,6 +48,8 @@ Capability
 ├─ inputs / outputs                     # typed specs, e.g. member_id: str
 ├─ checkpoint + checkpoint_text         # how we know the goal was reached
 ├─ business_outcomes / failure_patterns # deterministic text signals for classification
+├─ examples                             # runnable input→result examples, so a tester
+│                                       #   can follow the list to verify each outcome
 └─ steps: [{ action, target{strategy, role, name, name_ordinal, ordinal},
              value, assertion, on_error }]
 ```
@@ -62,6 +64,8 @@ Six principles govern it:
 6. **Customer data encrypted at rest.** Input values are AES-256-GCM encrypted with a per-tenant key before they touch disk; the locator strategy stays plaintext so the artifact remains reviewable.
 
 The schema is the contract the calling agent sees, not just a step list: typed inputs it supplies, typed outputs it gets back, and a checkpoint that defines success.
+
+Each capability also carries **runnable `examples`** — concrete input values mapped to their expected result (success / business_outcome / failure) with a note on what the tester should see. The admin console renders these as a "Test examples" table, so a tester can replay every listed case and confirm the result matches without knowing the target system's internals. Every example is a real, verified input (the mock's planted member IDs, a fresh vs. taken username, a too-short password, the public SauceDemo / The Internet test credentials) — not a placeholder.
 
 ## 3. Determinism & error handling
 
