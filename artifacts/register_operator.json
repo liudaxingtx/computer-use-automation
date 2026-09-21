@@ -1,11 +1,12 @@
 {
   "meta": {
     "name": "register_operator",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Register a new operator account. Type username carol, password secret99, and email carol@example.com into the form, then submit it. Stop when the registration result page is shown.",
     "surface": "browser",
     "domain": "localhost:9000",
-    "created_at": "2026-09-20T13:39:25.908252Z"
+    "created_at": "2026-09-20T13:39:25.908252Z",
+    "optimized_at": "2026-09-21T11:37:10.448704Z"
   },
   "start_url": "http://localhost:9000/register",
   "inputs": [
@@ -34,28 +35,7 @@
       "type": "str",
       "source": "result page",
       "label": "status",
-      "extract": ""
-    },
-    {
-      "name": "username",
-      "type": "str",
-      "source": "result page",
-      "label": "username",
-      "extract": ""
-    },
-    {
-      "name": "password",
-      "type": "str",
-      "source": "result page",
-      "label": "password",
-      "extract": ""
-    },
-    {
-      "name": "email",
-      "type": "str",
-      "source": "result page",
-      "label": "email",
-      "extract": ""
+      "extract": "font b"
     }
   ],
   "checkpoint": "goal reached",
@@ -83,7 +63,8 @@
         "email": "testop@example.com"
       },
       "result": "success",
-      "note": "REGISTRATION SUCCESS \u2014 use a fresh username (restart mock to reset if already taken)"
+      "note": "REGISTRATION SUCCESS — use a fresh username (restart mock to reset if already taken)",
+      "expect": {}
     },
     {
       "inputs": {
@@ -92,7 +73,8 @@
         "email": "a@x.com"
       },
       "result": "business_outcome",
-      "note": "USERNAME TAKEN \u2014 admin already exists"
+      "note": "USERNAME TAKEN — admin already exists",
+      "expect": {}
     },
     {
       "inputs": {
@@ -101,7 +83,8 @@
         "email": "pwtest@example.com"
       },
       "result": "business_outcome",
-      "note": "INVALID PASSWORD \u2014 shorter than 6 chars"
+      "note": "INVALID PASSWORD — shorter than 6 chars",
+      "expect": {}
     },
     {
       "inputs": {
@@ -110,7 +93,8 @@
         "email": "x@x.com"
       },
       "result": "business_outcome",
-      "note": "INVALID INPUT \u2014 username is required"
+      "note": "INVALID INPUT — username is required",
+      "expect": {}
     }
   ],
   "steps": [
