@@ -36,6 +36,8 @@ class ReplayRun(BaseModel):
     started_at: datetime
     duration_ms: int
     source: Literal["user", "admin"] = "user"   # user call vs admin op (Execute/Replay)
+    resolved_result: Optional[str] = None       # a failed run later fixed: the new result
+    resolved_at: Optional[datetime] = None      # when a successful re-run verified the fix
 
 
 def _resolve_locator(page: Page, target: Optional[LocatorStrategy]):

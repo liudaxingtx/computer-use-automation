@@ -104,9 +104,11 @@ def _capabilities() -> list[dict]:
 
 
 def _run_stats(name: str) -> dict:
+    # Only user calls count, matching the statistics report — admin Execute /
+    # Replay ops are operations, not real traffic.
     stats = {"success": 0, "business_outcome": 0, "failure": 0, "total": 0}
     for run in ReplayStore().list_runs():
-        if run.capability == name:
+        if run.capability == name and run.source == "user":
             stats[run.result] += 1
             stats["total"] += 1
     return stats
@@ -224,13 +226,21 @@ def _run_task(name: str, inputs: dict, source: Literal["user", "admin"] = "user"
 def _rerun_task(run_id: str) -> dict:
     """Re-run a recorded invocation with its original inputs. Inputs are
     decrypted only at the moment of replay (never exposed by the report); the
-    re-run is itself recorded as a new invocation (an admin op, not a user call)."""
+    re-run is itself recorded as a new invocation (an admin op, not a user call).
+    If the original was a failure and the re-run succeeds, the original is
+    stamped as resolved (failure → new result)."""
     store = ReplayStore()
     run = store.load(run_id, decrypt=True)
     cap = _load_capability(run.capability)
     result = _execute_replay(cap, run.inputs, run.capability,
                              echo_inputs=False, source="admin")
     result["rerun_of"] = run_id
+
+    # A successful re-run of a previously-failed invocation proves the fix:
+    # mark the original record resolved with the new result.
+    if run.result == "failure" and result["result"] in ("success", "business_outcome"):
+        store.record_resolution(run_id, result["result"])
+
     return result
 
 
@@ -315,6 +325,8 @@ def _stats_json() -> dict:
         entry = {
             "id": run_id,
             "result": run.result,
+            "resolved_result": run.resolved_result,
+            "resolved_at": run.resolved_at.isoformat() if run.resolved_at else None,
             "started_at": run.started_at.isoformat(),
             "duration_ms": run.duration_ms,
             "diagnostic": run.diagnostic,

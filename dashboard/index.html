@@ -900,12 +900,20 @@ function runRow(r) {
       `${esc(k)}=<span class="enc">${encryptPreview(v)}</span>`).join('  ') || '—';
     body = `<div class="cr-body"><span class="enc-lock">🔒 encrypted input</span> ${enc}</div>`;
     if (r.diagnostic) body += `<div class="cr-body"><span class="cdiag">✗ ${esc(r.diagnostic)}</span></div>`;
+    // Replay stays available forever — the historical case is a reusable test.
     replayBtn = `<button class="replay" onclick="replayRun('${esc(r.id)}', this)">↻ Replay</button>`;
   }
-  // successful calls: no data, no replay — we only care that they succeeded.
+  // Result pill: a resolved failure shows "~~failure~~ → new_result" so it's
+  // clear the case was fixed (not erased), and Replay remains for re-testing.
+  let pill;
+  if (r.result === 'failure' && r.resolved_result) {
+    pill = `<span class="pill failure" style="text-decoration:line-through;opacity:.55">failure</span> <span style="color:var(--dim)">→</span> <span class="pill ${r.resolved_result}">${RESULT[r.resolved_result] || r.resolved_result}</span>`;
+  } else {
+    pill = `<span class="pill ${r.result}">${RESULT[r.result] || r.result}</span>`;
+  }
   return `<div class="callrow ${r.result}">
     <div class="cr-head">
-      <span class="pill ${r.result}">${RESULT[r.result] || r.result}</span>
+      ${pill}
       <span class="ctime">${fmtTime(r.started_at)}</span>
       <span class="cdur">${dur}</span>
       ${replayBtn}

@@ -74,6 +74,18 @@ class ReplayStore:
             }
         return run
 
+    def record_resolution(self, run_id: str, new_result: str) -> None:
+        """Record that a previously-failed run was fixed: stamp the new result and
+        when it was verified by a successful re-run. Encrypted inputs untouched."""
+        from datetime import datetime, timezone
+        path = self.directory / f"{run_id}.json"
+        if not path.exists():
+            return
+        run = ReplayRun.model_validate_json(path.read_text())
+        run.resolved_result = new_result
+        run.resolved_at = datetime.now(timezone.utc)
+        path.write_text(run.model_dump_json(indent=2))
+
     def list_runs(self) -> list[ReplayRun]:
         """Every recorded run, oldest first. Inputs left encrypted (cheap read)."""
         if not self.directory.exists():
