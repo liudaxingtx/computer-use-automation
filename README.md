@@ -50,7 +50,21 @@ Then open:
 | `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, statistics report (per-task rates + one-click replay), delete, register new tasks |
 | `http://localhost:8123/user` | **User runner** | Pick a task from a dropdown → fill its inputs → run → see the result |
 
-### 1.5 Test suite
+### 1.5 Demo path — discover a goal, then replay it
+
+The end-to-end thread, in two commands (with the mock running):
+
+```bash
+# 1. Discover — the LLM drives the mock to accomplish a goal, records a Capability
+.venv/bin/python -m agent.main --task "Look up member 1001 and read their balance"
+
+# 2. Replay — deterministic, no LLM in the loop
+.venv/bin/python -m agent.cli verify lookup_member --input member_id=1001
+```
+
+Step 1 is the *only* step that needs API keys and makes real LLM calls; step 2 is pure deterministic code. Evidence for both lands under `evidence/`.
+
+### 1.6 Test suite
 
 ```bash
 ./scripts/run_tests.sh
@@ -94,7 +108,8 @@ dashboard/    both web interfaces — server.py, index.html (admin), user.html (
               screenshots/
 mock-app/     a deliberately-hostile local stand-in for a legacy bank back-office app
 artifacts/    the recorded solution paths — one Capability JSON per task (version-controlled)
-evidence/     raw discovery transcripts + append-only run logs (inputs encrypted at rest)
+evidence/     an example artifact + raw discovery transcripts + append-only run logs
+              (inputs encrypted at rest)
 scripts/      one-command tests, screenshot/evidence generators, artifact helpers
 ```
 

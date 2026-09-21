@@ -13,8 +13,8 @@ test-results/
 .env.*
 !.env.example
 
-# Confidential interview assignment — do not commit
-assignmentAComputerUseSystem.pdf
+# Interview assignment PDFs and personal docs — do not commit
+*.pdf
 
 # The recorded solution paths (artifacts/) are version-controlled — a deliverable.
 # Evidence is deliberately committed (raw discovery transcripts + run logs) — do not ignore.
