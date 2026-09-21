@@ -35,7 +35,7 @@
       "type": "str",
       "source": "result page",
       "label": "status",
-      "extract": "font b"
+      "extract": "font[size=\"4\"] b"
     }
   ],
   "checkpoint": "goal reached",
