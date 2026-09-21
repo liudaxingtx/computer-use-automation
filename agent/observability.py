@@ -35,15 +35,21 @@ class ReplayStore:
     # ---- persistence ----
 
     def record(self, run: ReplayRun) -> str:
-        """Persist a ReplayRun. Input values are encrypted at rest first.
+        """Persist a ReplayRun. Inputs are encrypted at rest. Successful runs
+        store no inputs/outputs — we only care that they succeeded and how long
+        they took, so their data would be redundant. Failed runs keep their
+        encrypted inputs so a maintainer can replay the exact failing invocation.
         Returns the run id (the filename stem)."""
         from . import crypto
 
-        key = crypto.get_key(self.tenant_id)
-        encrypted_inputs = {
-            k: crypto.encrypt(str(v), key) for k, v in run.inputs.items()
-        }
-        stored = run.model_copy(update={"inputs": encrypted_inputs})
+        if run.result == "failure":
+            key = crypto.get_key(self.tenant_id)
+            encrypted_inputs = {
+                k: crypto.encrypt(str(v), key) for k, v in run.inputs.items()
+            }
+            stored = run.model_copy(update={"inputs": encrypted_inputs, "outputs": {}})
+        else:
+            stored = run.model_copy(update={"inputs": {}, "outputs": {}})
 
         self.directory.mkdir(parents=True, exist_ok=True)
         run_id = (

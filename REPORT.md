@@ -83,7 +83,7 @@ Every invocation is **recorded, measured, and re-runnable**:
 - **Real-time rates.** Telemetry aggregates, per task + version: `success`, `business_outcome`, `failure` counts and their **rates** (`success_rate`, `business_rate`, **`failure_rate`**) — if a task starts erroring, the error rate is visible immediately.
 - **Failure inbox.** Every non-success run lands in an unresolved-failures inbox; a maintainer marks them resolved after a fix.
 - **Replay-the-error loop.** Any failure can be re-run deterministically with its exact original inputs to reproduce and verify a fix.
-- **Statistics report (admin console).** A live report that aggregates, per task, the counts **and rates** (with a rate bar), then lists every invocation: successes show timestamp + duration + extracted numbers, failures show the **encrypted** input (`enc:…`, never decrypted in the report) + diagnostic. Every row has a **↻ Replay** button that re-runs that exact invocation with its original inputs.
+- **Statistics report (admin console).** A live report that aggregates, per task, the counts **and rates** (with a rate bar), then lists every *user* invocation (admin Execute/Replay ops are excluded): successes show only timestamp + duration (their data isn't stored — we don't care about them), failures show the **encrypted** input (`enc:…`, never decrypted in the report) + diagnostic and a **↻ Replay** button to re-run the exact failing invocation.
 
 ## 4. Heterogeneity & multi-tenant
 
@@ -170,6 +170,6 @@ Next with more time: canonicalization (`/item/12345` → `/item/:id`) to collaps
 | `1003` | ROBERT CHEN · ACTIVE · $18,900 |
 | `9999` | no such member |
 
-**4. Statistics report.** Open `http://localhost:8123/` → **Statistics**: per-task success/business/failure rates, a run ledger (successes show timing + extracted numbers, failures show the *encrypted* input), and one-click **Replay** of any recorded invocation.
+**4. Statistics report.** Open `http://localhost:8123/` → **Statistics**: per-task success/business/failure rates over *user* calls (admin ops excluded), and a run ledger — successes show only timing, failures show the *encrypted* input + a one-click **Replay**.
 
 **5. Implemented stretch goal.** The **agent-facing capability interface** (§8 of the brief) is implemented: the admin console (`/`) exposes saved artifacts as a catalog of callable capabilities, the engine exposes them over `POST /api/run` with typed args, and the user runner (`/user`) demonstrates one being invoked end to end.

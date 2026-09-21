@@ -35,6 +35,7 @@ class ReplayRun(BaseModel):
     screenshot: Optional[str] = None   # path to the failure screenshot
     started_at: datetime
     duration_ms: int
+    source: Literal["user", "admin"] = "user"   # user call vs admin op (Execute/Replay)
 
 
 def _resolve_locator(page: Page, target: Optional[LocatorStrategy]):

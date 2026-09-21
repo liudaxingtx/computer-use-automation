@@ -18,6 +18,7 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from typing import Literal
 from urllib.parse import unquote, urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -155,7 +156,8 @@ def _task_detail(cap) -> dict:
     }
 
 
-def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True) -> dict:
+def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
+                    source: Literal["user", "admin"] = "user") -> dict:
     from playwright.sync_api import sync_playwright
 
     from agent.replay import replay
@@ -168,6 +170,7 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True) -> d
         run = replay(page, cap, inputs=inputs, screenshot_dir=str(SHOTS))
         page.screenshot(path=str(SHOTS / shot))
         browser.close()
+    run.source = source
     # Persist every invocation so the statistics report can answer "how many
     # times was this task really used, and what happened".
     ReplayStore().record(run)
@@ -182,19 +185,20 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True) -> d
     }
 
 
-def _run_task(name: str, inputs: dict) -> dict:
+def _run_task(name: str, inputs: dict, source: Literal["user", "admin"] = "user") -> dict:
     cap = _load_capability(name)
-    return _execute_replay(cap, inputs, name)
+    return _execute_replay(cap, inputs, name, source=source)
 
 
 def _rerun_task(run_id: str) -> dict:
     """Re-run a recorded invocation with its original inputs. Inputs are
     decrypted only at the moment of replay (never exposed by the report); the
-    re-run is itself recorded as a new invocation."""
+    re-run is itself recorded as a new invocation (an admin op, not a user call)."""
     store = ReplayStore()
     run = store.load(run_id, decrypt=True)
     cap = _load_capability(run.capability)
-    result = _execute_replay(cap, run.inputs, run.capability, echo_inputs=False)
+    result = _execute_replay(cap, run.inputs, run.capability,
+                             echo_inputs=False, source="admin")
     result["rerun_of"] = run_id
     return result
 
@@ -248,10 +252,12 @@ def _runs_json() -> dict:
 def _stats_json() -> dict:
     """Statistics report for the admin console (replaces the flat call log).
 
-    Aggregated per task: total + success / business-outcome / failure counts and
-    rates. The run ledger shows timing + extracted numbers for successes, and the
-    *encrypted* input (never decrypted here) + diagnostic for failures, with a
-    run id so a maintainer can replay the exact failing invocation.
+    Counts only *user* calls (source == "user"); admin Execute/Replay ops are
+    excluded. Aggregated per task: total + success / business-outcome / failure
+    counts and rates. The run ledger shows timing for successes (their data is
+    not stored — we only care that they succeeded), and the *encrypted* input
+    (never decrypted here) + diagnostic for failures, with a run id so a
+    maintainer can replay the exact failing invocation.
     """
     store = ReplayStore()
     entries = []
@@ -262,6 +268,8 @@ def _stats_json() -> dict:
             except Exception:
                 continue
     entries.sort(key=lambda x: x[1].started_at, reverse=True)
+    # Only user calls count; admin ops (Execute/Replay) are excluded outright.
+    entries = [(rid, r) for rid, r in entries if r.source == "user"]
 
     by_task = {}
     for run_id, run in entries:
@@ -283,8 +291,6 @@ def _stats_json() -> dict:
         if run.result == "failure":
             # Encrypted input only — the report never decrypts customer data.
             entry["inputs_encrypted"] = run.inputs
-        else:
-            entry["outputs"] = run.outputs
         s["runs"].append(entry)
 
     total = len(entries)
@@ -414,6 +420,7 @@ def _discover_task(url: str, task: str, name: str = "") -> dict:
         run = replay(page, cap, inputs=verify_inputs)
         page.screenshot(path=str(SHOTS / f"run_{name}.png"))
         browser.close()
+    run.source = "admin"  # the record-time verification is an admin op
     ReplayStore().record(run)
 
     return {
@@ -497,10 +504,13 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/run":
                 name = data.get("task")
                 inputs = data.get("inputs") or {}
+                source = data.get("source", "user")
+                if source not in ("user", "admin"):
+                    source = "user"
                 if not name:
                     self._json({"error": "task required"}, 400)
                     return
-                self._json(_run_task(name, inputs))
+                self._json(_run_task(name, inputs, source=source))
             elif path == "/api/rerun":
                 run_id = data.get("run_id")
                 if not run_id:

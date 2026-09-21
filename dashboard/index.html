@@ -519,7 +519,7 @@ async function runTest(name) {
   btn.disabled = true; btn.textContent = 'Executing…';
   const res = await fetch('/api/run', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task: name, inputs })
+    body: JSON.stringify({ task: name, inputs, source: 'admin' })
   });
   const r = await res.json();
   btn.disabled = false; btn.textContent = '▶ Execute';
@@ -649,22 +649,21 @@ function renderStats(d) {
 function runRow(r) {
   const dur = r.duration_ms != null ? r.duration_ms + 'ms' : '';
   let body = '';
+  let replayBtn = '';
   if (r.result === 'failure') {
     const enc = Object.entries(r.inputs_encrypted || {}).map(([k, v]) =>
       `${esc(k)}=<span class="enc">${encryptPreview(v)}</span>`).join('  ') || '—';
     body = `<div class="cr-body"><span class="enc-lock">🔒 encrypted input</span> ${enc}</div>`;
     if (r.diagnostic) body += `<div class="cr-body"><span class="cdiag">✗ ${esc(r.diagnostic)}</span></div>`;
-  } else {
-    const outputs = (r.outputs && Object.keys(r.outputs).length) ? esc(JSON.stringify(r.outputs)) : '';
-    if (outputs) body = `<div class="cr-body"><span class="coutputs">outputs: ${outputs}</span></div>`;
-    else if (r.diagnostic) body = `<div class="cr-body">${esc(r.diagnostic)}</div>`;
+    replayBtn = `<button class="replay" onclick="replayRun('${esc(r.id)}', this)">↻ Replay</button>`;
   }
+  // successful calls: no data, no replay — we only care that they succeeded.
   return `<div class="callrow ${r.result}">
     <div class="cr-head">
       <span class="pill ${r.result}">${RESULT[r.result] || r.result}</span>
       <span class="ctime">${fmtTime(r.started_at)}</span>
       <span class="cdur">${dur}</span>
-      <button class="replay" onclick="replayRun('${esc(r.id)}', this)">↻ Replay</button>
+      ${replayBtn}
     </div>
     ${body}
   </div>`;
