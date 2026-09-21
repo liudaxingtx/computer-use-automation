@@ -417,6 +417,9 @@ def _optimize_task(name: str, instruction: str) -> dict:
         "- checkpoint_text must be literal text that appears on the page on success.\n"
         "- business_outcomes are legitimate expected answers (e.g. \"no such member\"); "
         "failure_patterns are hard errors (e.g. \"access denied\").\n"
+        "- Design a standardized output: outputs[].name are the keys of the success JSON "
+        "object (each with a clear type), and each business_outcome returns "
+        "{\"outcome\": label} — so every result case has a well-defined JSON shape.\n"
         "- Do not invent fields; only change what the instruction asks for."
     )
 

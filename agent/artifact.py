@@ -81,6 +81,8 @@ class Example(BaseModel):
     inputs: dict = {}   # concrete input values (keys match the input specs)
     result: str = ""    # success | business_outcome | failure
     note: str = ""      # what the tester should see, e.g. "JOHN SMITH · ACTIVE"
+    expect: dict = {}   # expected output assertion: {"message": "success"} means
+                        # outputs["message"] must equal "success", else the task failed
 
 
 class CapabilityMeta(BaseModel):

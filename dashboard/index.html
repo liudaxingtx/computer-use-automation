@@ -249,6 +249,12 @@
   .ex-form select, .ex-form input { background: var(--panel-2); border: 1px solid var(--line); color: var(--txt); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
   .ex-form input[type="text"] { flex: 1; min-width: 140px; }
   .ex-form select:focus, .ex-form input:focus { border-color: rgba(56,189,248,0.5); box-shadow: 0 0 0 2px rgba(56,189,248,0.15); }
+  .contract { display: flex; flex-direction: column; gap: 6px; }
+  .c-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
+  .c-row code { font-family: ui-monospace, Menlo, monospace; color: var(--violet); }
+  .c-arrow { color: var(--dim); }
+  .c-why { color: var(--dim); font-size: 11px; }
+  .c-none { color: var(--dim); font-style: italic; }
 
   .empty { color: var(--dim); font-size: 13px; padding: 14px 0; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -485,15 +491,37 @@ function renderModal(t) {
       </tbody>
     </table>` : '';
 
+  const contractHtml = `
+    <div class="contract">
+      <div class="c-row">
+        <span class="pill success">success</span>
+        <span class="c-arrow">→</span>
+        ${(t.outputs && t.outputs.length) ? `<code>${esc(JSON.stringify(outputShape(t.outputs)))}</code>` : '<span class="c-none">(no structured output declared)</span>'}
+      </div>
+      ${(t.business_outcomes || []).map(b => `
+        <div class="c-row">
+          <span class="pill business_outcome">business_outcome</span>
+          <span class="c-why">${esc(b.label || b.text)}</span>
+          <span class="c-arrow">→</span>
+          <code>{"outcome": "${esc(b.label || b.text)}"}</code>
+        </div>`).join('')}
+      <div class="c-row">
+        <span class="pill failure">failure</span>
+        <span class="c-arrow">→</span>
+        <span class="c-none">no JSON — the run errored out mid-flow</span>
+      </div>
+    </div>`;
+
   const examplesHtml = (t.examples || []).length ? `
     <table class="ptable">
-      <thead><tr><th>#</th><th>outcome</th><th>input values</th><th>you'll see</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>outcome</th><th>input values</th><th>you'll see</th><th>expect (output assertion)</th><th></th></tr></thead>
       <tbody>${(t.examples || []).map((e, i) => `
         <tr>
           <td>${i + 1}</td>
           <td><span class="pill ${e.result}">${RESULT[e.result] || e.result}</span></td>
           <td><code>${esc(JSON.stringify(e.inputs))}</code></td>
           <td>${esc(e.note || '')}</td>
+          <td>${(e.expect && Object.keys(e.expect).length) ? `<code>${esc(JSON.stringify(e.expect))}</code>` : '<span style="color:var(--dim)">—</span>'}</td>
           <td>
             <button class="fill" onclick="fillExample(${i})">fill</button>
             <button class="fill" onclick="editExample(${i})">✎</button>
@@ -569,6 +597,7 @@ function renderModal(t) {
           </select>
           <input type="text" id="exInputs" placeholder='input values JSON, e.g. {"member_id": "1001"}'>
           <input type="text" id="exNote" placeholder="what you'll see, e.g. JOHN SMITH · ACTIVE">
+          <input type="text" id="exExpect" placeholder='expect (optional) JSON, e.g. {"message":"success"}'>
           <button class="fill" onclick="saveExample()">Save</button>
           <button class="fill" style="background:transparent;color:var(--dim)" onclick="cancelExample()">Cancel</button>
         </div>
@@ -580,6 +609,11 @@ function renderModal(t) {
     <div class="msection">
       <h3>Extracted outputs</h3>
       ${outputsHtml || '<div class="empty">This task declares no outputs.</div>'}
+    </div>
+
+    <div class="msection">
+      <h3>Standardized output — what the task returns</h3>
+      ${contractHtml}
     </div>
 
     <div class="msection">
@@ -608,10 +642,19 @@ function renderModal(t) {
     </div>`;
 }
 
+function outputShape(outputs) {
+  // Success JSON shape: {"field": "type", ...} — the standardized success output.
+  const o = {};
+  (outputs || []).forEach(f => { o[f.name] = f.type || 'str'; });
+  return o;
+}
+
 function highlight(v) {
   // highlight {param} placeholders
   return esc(v).replace(/\{(\w+)\}/g, '<span class="param">{$1}</span>');
 }
+
+let currentExpect = null;  // the expect assertion of the example just filled
 
 function fillExample(i) {
   const ex = currentExamples[i];
@@ -620,6 +663,7 @@ function fillExample(i) {
     const el = document.querySelector(`[data-input="${k}"]`);
     if (el) el.value = v;
   }
+  currentExpect = (ex.expect && Object.keys(ex.expect).length) ? ex.expect : null;
   toast('Inputs filled — press Execute to verify');
 }
 
@@ -630,6 +674,7 @@ function addExample() {
   $('#exResult').value = 'success';
   $('#exInputs').value = '';
   $('#exNote').value = '';
+  $('#exExpect').value = '';
   $('#exForm').style.display = '';
 }
 
@@ -640,6 +685,7 @@ function editExample(i) {
   $('#exResult').value = ex.result || 'success';
   $('#exInputs').value = JSON.stringify(ex.inputs || {});
   $('#exNote').value = ex.note || '';
+  $('#exExpect').value = (ex.expect && Object.keys(ex.expect).length) ? JSON.stringify(ex.expect) : '';
   $('#exForm').style.display = '';
 }
 
@@ -649,7 +695,13 @@ async function saveExample() {
   let inputs;
   try { inputs = JSON.parse($('#exInputs').value.trim() || '{}'); }
   catch (e) { toast('Inputs must be valid JSON'); return; }
-  const example = { inputs, result: $('#exResult').value, note: $('#exNote').value.trim() };
+  let expect = {};
+  const expectRaw = $('#exExpect').value.trim();
+  if (expectRaw) {
+    try { expect = JSON.parse(expectRaw); }
+    catch (e) { toast('Expect must be valid JSON (or empty)'); return; }
+  }
+  const example = { inputs, result: $('#exResult').value, note: $('#exNote').value.trim(), expect };
   const action = editingExampleIndex >= 0 ? 'update' : 'add';
   const index = editingExampleIndex;
   try {
@@ -732,6 +784,7 @@ async function runTest(name) {
     const v = normalizeInput(el.value).trim();
     if (v !== '') inputs[el.dataset.input] = v;
   });
+  const expect = currentExpect;  // capture the filled example's assertion (may be null)
   const btn = document.querySelector('button.run');
   btn.disabled = true; btn.textContent = 'Executing…';
   const res = await fetch('/api/run', {
@@ -745,15 +798,33 @@ async function runTest(name) {
   box.className = 'result ' + r.result;
   const outputsHtml = (r.outputs && Object.keys(r.outputs).length)
     ? `<div class="outputs"><div class="olabel">Extracted data</div><pre>${esc(JSON.stringify(r.outputs, null, 2))}</pre></div>` : '';
+  // Output assertion: if the filled example declares an `expect`, the returned
+  // JSON must match it — otherwise the run is flagged as failing the check.
+  const expectHtml = expect ? renderExpectCheck(r.outputs, expect) : '';
   box.innerHTML = `
     <div class="rhead">
       <span class="rlabel">${RESULT[r.result] || r.result}</span>
       <span class="rtime">${r.duration_ms != null ? r.duration_ms + ' ms' : ''}</span>
     </div>
+    ${expectHtml}
     ${r.diagnostic ? `<div class="rdiag">${esc(r.diagnostic)}</div>` : ''}
     ${outputsHtml}
     ${r.screenshot ? `<img src="${esc(r.screenshot)}" onerror="this.style.display='none'">` : ''}`;
+  currentExpect = null;
   loadTasks();
+}
+
+function renderExpectCheck(outputs, expect) {
+  const problems = [];
+  for (const [k, v] of Object.entries(expect)) {
+    const got = (outputs || {})[k];
+    if (got === undefined) problems.push(`${k}: missing`);
+    else if (String(got) !== String(v)) problems.push(`${k}: got "${got}", want "${v}"`);
+  }
+  if (problems.length) {
+    return `<div class="rdiag" style="color:var(--red);border:1px solid rgba(248,113,113,0.35);border-radius:8px;padding:8px 10px">✗ expect failed: ${esc(problems.join('; '))}</div>`;
+  }
+  return `<div class="rdiag" style="color:var(--green);border:1px solid rgba(52,211,153,0.35);border-radius:8px;padding:8px 10px">✓ expect matched: ${esc(JSON.stringify(expect))}</div>`;
 }
 
 function openDiscover() {
