@@ -4,7 +4,7 @@
 
 An LLM-driven system that gives AI agents hands on legacy software that has **no API**: it *discovers* how to operate a UI, *records* the successful run as a structured artifact, and *replays* it deterministically — **no LLM in the loop** — so an agent can invoke it reliably and cheaply in production.
 
-The whole project is three blocks: a **core engine** (discover → record → replay), an **admin console** (manage and create tasks), and a **user-facing runner** (use tasks). This README is the single source of truth; the formal submission write-up lives in [`REPORT.md`](REPORT.md).
+The whole project is three blocks: a **core engine** (discover → record → replay), an **admin console** (manage and create tasks), and a **user-facing runner** (use tasks). This README is the single source of truth.
 
 ---
 
