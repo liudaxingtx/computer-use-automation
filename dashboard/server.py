@@ -163,12 +163,11 @@ def _task_detail(cap) -> dict:
     }
 
 
-def _run_task(name: str, inputs: dict) -> dict:
+def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True) -> dict:
     from playwright.sync_api import sync_playwright
 
     from agent.replay import replay
 
-    cap = _load_capability(name)
     shot = f"run_{name}.png"
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -177,8 +176,8 @@ def _run_task(name: str, inputs: dict) -> dict:
         run = replay(page, cap, inputs=inputs, screenshot_dir=str(SHOTS))
         page.screenshot(path=str(SHOTS / shot))
         browser.close()
-    # Persist every invocation so the call-log / monitoring view can answer
-    # "how many times was this task really used, and what happened".
+    # Persist every invocation so the statistics report can answer "how many
+    # times was this task really used, and what happened".
     ReplayStore().record(run)
     return {
         "task": name,
@@ -186,9 +185,26 @@ def _run_task(name: str, inputs: dict) -> dict:
         "diagnostic": run.diagnostic,
         "outputs": run.outputs,
         "screenshot": f"/api/screenshots/{shot}",
-        "inputs": inputs,
+        "inputs": inputs if echo_inputs else None,
         "duration_ms": run.duration_ms,
     }
+
+
+def _run_task(name: str, inputs: dict) -> dict:
+    cap = _load_capability(name)
+    return _execute_replay(cap, inputs, name)
+
+
+def _rerun_task(run_id: str) -> dict:
+    """Re-run a recorded invocation with its original inputs. Inputs are
+    decrypted only at the moment of replay (never exposed by the report); the
+    re-run is itself recorded as a new invocation."""
+    store = ReplayStore()
+    run = store.load(run_id, decrypt=True)
+    cap = _load_capability(run.capability)
+    result = _execute_replay(cap, run.inputs, run.capability, echo_inputs=False)
+    result["rerun_of"] = run_id
+    return result
 
 
 def _runs_json() -> dict:
@@ -234,6 +250,76 @@ def _runs_json() -> dict:
         "failure": sum(1 for r in runs if r["result"] == "failure"),
         "by_task": by_task,
         "runs": runs,
+    }
+
+
+def _stats_json() -> dict:
+    """Statistics report for the admin console (replaces the flat call log).
+
+    Aggregated per task: total + success / business-outcome / failure counts and
+    rates. The run ledger shows timing + extracted numbers for successes, and the
+    *encrypted* input (never decrypted here) + diagnostic for failures, with a
+    run id so a maintainer can replay the exact failing invocation.
+    """
+    store = ReplayStore()
+    entries = []
+    if store.directory.exists():
+        for f in sorted(store.directory.glob("*.json")):
+            try:
+                entries.append((f.stem, store.load(f.stem, decrypt=False)))
+            except Exception:
+                continue
+    entries.sort(key=lambda x: x[1].started_at, reverse=True)
+
+    by_task = {}
+    for run_id, run in entries:
+        s = by_task.setdefault(run.capability, {
+            "capability": run.capability,
+            "version": run.version,
+            "success": 0, "business_outcome": 0, "failure": 0, "total": 0,
+            "runs": [],
+        })
+        s[run.result] += 1
+        s["total"] += 1
+        entry = {
+            "id": run_id,
+            "result": run.result,
+            "started_at": run.started_at.isoformat(),
+            "duration_ms": run.duration_ms,
+            "diagnostic": run.diagnostic,
+        }
+        if run.result == "failure":
+            # Encrypted input only — the report never decrypts customer data.
+            entry["inputs_encrypted"] = run.inputs
+        else:
+            entry["outputs"] = run.outputs
+        s["runs"].append(entry)
+
+    total = len(entries)
+    n_success = sum(1 for _, r in entries if r.result == "success")
+    n_business = sum(1 for _, r in entries if r.result == "business_outcome")
+    n_failure = sum(1 for _, r in entries if r.result == "failure")
+
+    def _rate(n):
+        return round(n / total, 3) if total else 0.0
+
+    tasks = []
+    for name in sorted(by_task):
+        s = dict(by_task[name])
+        s["success_rate"] = round(s["success"] / s["total"], 3)
+        s["business_rate"] = round(s["business_outcome"] / s["total"], 3)
+        s["failure_rate"] = round(s["failure"] / s["total"], 3)
+        tasks.append(s)
+
+    return {
+        "total": total,
+        "success": n_success,
+        "business_outcome": n_business,
+        "failure": n_failure,
+        "success_rate": _rate(n_success),
+        "business_rate": _rate(n_business),
+        "failure_rate": _rate(n_failure),
+        "by_task": tasks,
     }
 
 
@@ -396,6 +482,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(build_tasks())
         elif path == "/api/runs":
             self._json(_runs_json())
+        elif path == "/api/stats":
+            self._json(_stats_json())
         elif path.startswith("/api/task/"):
             name = unquote(path[len("/api/task/"):])
             try:
@@ -423,6 +511,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"error": "task required"}, 400)
                     return
                 self._json(_run_task(name, inputs))
+            elif path == "/api/rerun":
+                run_id = data.get("run_id")
+                if not run_id:
+                    self._json({"error": "run_id required"}, 400)
+                    return
+                self._json(_rerun_task(run_id))
             elif path == "/api/discover":
                 self._json(_discover_task(
                     data.get("url", ""), data.get("task", ""), data.get("name", "")

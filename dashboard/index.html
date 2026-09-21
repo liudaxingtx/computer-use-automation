@@ -168,6 +168,23 @@
   .cr-body .cdiag { color: var(--red); }
   .cr-body .coutputs { color: var(--violet); }
 
+  /* statistics report */
+  .stat-task { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; background: var(--panel); }
+  .st-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .st-name { font-weight: 700; font-size: 14px; }
+  .st-count { margin-left: auto; font-size: 11.5px; color: var(--dim); }
+  .st-metrics { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; font-size: 12px; color: var(--dim); }
+  .st-ok { color: var(--green); } .st-bo { color: var(--amber); } .st-fl { color: var(--red); }
+  .rbar { flex: 1; min-width: 100px; height: 8px; border-radius: 999px; background: rgba(120,160,220,0.12); overflow: hidden; }
+  .rbar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--green), var(--cyan)); }
+  .rbar-pct { font-size: 11px; font-family: ui-monospace, Menlo, monospace; color: var(--dim); }
+  button.replay { margin-left: auto; background: var(--panel-2); color: var(--cyan); border: 1px solid rgba(56,189,248,0.35);
+    font-weight: 700; font-size: 11.5px; padding: 3px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+  button.replay:hover { border-color: rgba(56,189,248,0.6); box-shadow: 0 0 10px rgba(56,189,248,0.25); }
+  button.replay:disabled { opacity: 0.5; cursor: not-allowed; }
+  .enc { font-family: ui-monospace, Menlo, monospace; color: var(--violet); font-size: 11px; word-break: break-all; }
+  .enc-lock { color: var(--dim); font-size: 11.5px; }
+
   /* delete + confirm */
   button.danger { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.4);
     font-weight: 700; font-size: 12.5px; padding: 6px 14px; border-radius: 8px; cursor: pointer; }
@@ -237,7 +254,7 @@
       <span class="chip">Unverified <span class="n" id="sUnverified">–</span></span>
     </div>
     <button class="register" onclick="openDiscover()">+ Register task</button>
-    <button class="calllog" onclick="openCallLog()">Call log</button>
+    <button class="calllog" onclick="openStats()">Statistics</button>
     <a class="userview" href="/user">User view →</a>
   </header>
   <div id="domains"></div>
@@ -276,14 +293,14 @@
 <div class="toast" id="toast"></div>
 <div class="lightbox" id="lightbox"><img id="lightboxImg" alt=""><div class="lcap" id="lightboxCap"></div></div>
 
-<!-- call log / monitoring modal -->
+<!-- statistics report modal -->
 <div class="overlay" id="cloverlay">
-  <div class="modal" id="clmodal">
+  <div class="modal" id="clmodal" style="max-width:1000px">
     <div class="mhead">
-      <span class="mname">Call log</span>
+      <span class="mname">Statistics report</span>
       <button class="close" onclick="$('#cloverlay').classList.remove('open')">✕</button>
     </div>
-    <div class="mdesc">Every invocation of a recorded task — how many times it ran, whether it succeeded, and the exact inputs used (including failures).</div>
+    <div class="mdesc">Per-task call statistics with success / failure rates. Successes show timing and extracted numbers; failures show the encrypted input and can be replayed with one click.</div>
     <div id="clbody"></div>
   </div>
 </div>
@@ -582,51 +599,99 @@ function fmtTime(iso) {
   return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-async function openCallLog() {
+function pct(n) {
+  return n == null ? '—' : (Math.round(n * 1000) / 10) + '%';
+}
+
+async function openStats() {
   $('#cloverlay').classList.add('open');
   $('#clbody').innerHTML = '<div class="empty">Loading…</div>';
   try {
-    const res = await fetch('/api/runs');
-    const d = await res.json();
-    renderCallLog(d);
+    const d = await (await fetch('/api/stats')).json();
+    renderStats(d);
   } catch (e) {
     $('#clbody').innerHTML = `<div class="empty">Error: ${esc(String(e))}</div>`;
   }
 }
 
-function renderCallLog(d) {
-  const stats = `<div class="clog-head">
-    <span class="clog-stat">Total <b>${d.total ?? 0}</b></span>
-    <span class="clog-stat"><span class="ok"><b>${d.success ?? 0}</b> success</span></span>
-    <span class="clog-stat"><span class="bo"><b>${d.business_outcome ?? 0}</b> business</span></span>
-    <span class="clog-stat"><span class="fl"><b>${d.failure ?? 0}</b> failed</span></span>
+function renderStats(d) {
+  const head = `<div class="clog-head">
+    <span class="clog-stat">Total <b>${d.total ?? 0}</b> calls</span>
+    <span class="clog-stat"><span class="ok"><b>${d.success ?? 0}</b> success · ${pct(d.success_rate)}</span></span>
+    <span class="clog-stat"><span class="bo"><b>${d.business_outcome ?? 0}</b> business · ${pct(d.business_rate)}</span></span>
+    <span class="clog-stat"><span class="fl"><b>${d.failure ?? 0}</b> failed · ${pct(d.failure_rate)}</span></span>
   </div>`;
 
-  const taskChips = Object.keys(d.by_task || {}).sort().map(t => {
-    const s = d.by_task[t];
-    const fail = s.failure ? ` <span style="color:var(--red)">${s.failure}✗</span>` : '';
-    return `<span class="chip">${esc(t)} · <span class="n">${s.total}</span> <span style="color:var(--green)">${s.success}✓</span>${fail}</span>`;
-  }).join('');
-
-  const rows = (d.runs || []).map(r => {
-    const inputsJson = (r.inputs && Object.keys(r.inputs).length) ? esc(JSON.stringify(r.inputs)) : '—';
-    const outputsJson = (r.outputs && Object.keys(r.outputs).length) ? esc(JSON.stringify(r.outputs)) : '';
-    return `<div class="callrow ${r.result}">
-      <div class="cr-head">
-        <span class="pill ${r.result}">${RESULT[r.result] || r.result}</span>
-        <span class="cname">${esc(r.capability)}</span>
-        <span class="ctime">${fmtTime(r.started_at)}</span>
-        <span class="cdur">${r.duration_ms != null ? r.duration_ms + 'ms' : ''}</span>
+  const sections = (d.by_task || []).map(t => {
+    const ok = t.success + t.business_outcome;
+    const rows = (t.runs || []).map(r => runRow(r)).join('');
+    const okPct = t.total ? Math.round(ok / t.total * 100) : 0;
+    return `<div class="stat-task">
+      <div class="st-head">
+        <span class="st-name">${esc(t.capability)}</span>
+        <span class="ver">v${esc(t.version)}</span>
+        <span class="st-count">${t.total} call${t.total === 1 ? '' : 's'}</span>
       </div>
-      <div class="cr-body">inputs: <span class="kv">${inputsJson}</span></div>
-      ${r.diagnostic ? `<div class="cr-body"><span class="cdiag">✗ ${esc(r.diagnostic)}</span></div>` : ''}
-      ${outputsJson ? `<div class="cr-body"><span class="coutputs">outputs: ${outputsJson}</span></div>` : ''}
+      <div class="st-metrics">
+        <span class="st-ok">${t.success}✓ success</span>
+        <span class="st-bo">${t.business_outcome}● business</span>
+        <span class="st-fl">${t.failure}✗ failed · ${pct(t.failure_rate)}</span>
+        <div class="rbar"><div class="rbar-fill" style="width:${okPct}%"></div></div>
+        <span class="rbar-pct">${okPct}% ok</span>
+      </div>
+      <div class="calllist">${rows || '<div class="empty">No calls.</div>'}</div>
     </div>`;
   }).join('');
 
-  $('#clbody').innerHTML = stats
-    + (taskChips ? `<div class="clog-tasks">${taskChips}</div>` : '')
-    + `<div class="calllist">${rows || '<div class="empty">No calls recorded yet.</div>'}</div>`;
+  $('#clbody').innerHTML = head + (sections || '<div class="empty">No calls recorded yet.</div>');
+}
+
+function runRow(r) {
+  const dur = r.duration_ms != null ? r.duration_ms + 'ms' : '';
+  let body = '';
+  if (r.result === 'failure') {
+    const enc = Object.entries(r.inputs_encrypted || {}).map(([k, v]) =>
+      `${esc(k)}=<span class="enc">${encryptPreview(v)}</span>`).join('  ') || '—';
+    body = `<div class="cr-body"><span class="enc-lock">🔒 encrypted input</span> ${enc}</div>`;
+    if (r.diagnostic) body += `<div class="cr-body"><span class="cdiag">✗ ${esc(r.diagnostic)}</span></div>`;
+  } else {
+    const outputs = (r.outputs && Object.keys(r.outputs).length) ? esc(JSON.stringify(r.outputs)) : '';
+    if (outputs) body = `<div class="cr-body"><span class="coutputs">outputs: ${outputs}</span></div>`;
+    else if (r.diagnostic) body = `<div class="cr-body">${esc(r.diagnostic)}</div>`;
+  }
+  return `<div class="callrow ${r.result}">
+    <div class="cr-head">
+      <span class="pill ${r.result}">${RESULT[r.result] || r.result}</span>
+      <span class="ctime">${fmtTime(r.started_at)}</span>
+      <span class="cdur">${dur}</span>
+      <button class="replay" onclick="replayRun('${esc(r.id)}', this)">↻ Replay</button>
+    </div>
+    ${body}
+  </div>`;
+}
+
+function encryptPreview(v) {
+  const s = String(v ?? '');
+  return s.length > 30 ? esc(s.slice(0, 30)) + '…' : esc(s);
+}
+
+async function replayRun(runId, btn) {
+  btn.disabled = true; btn.textContent = 'Replaying…';
+  try {
+    const res = await fetch('/api/rerun', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ run_id: runId })
+    });
+    const r = await res.json();
+    if (r.error) { toast('Error: ' + r.error); return; }
+    toast(`Replayed → ${RESULT[r.result] || r.result} (${r.duration_ms ?? '?'}ms)`);
+    const d = await (await fetch('/api/stats')).json();
+    renderStats(d);
+  } catch (e) {
+    toast('Error: ' + String(e));
+  } finally {
+    btn.disabled = false; btn.textContent = '↻ Replay';
+  }
 }
 
 let pendingDelete = null;

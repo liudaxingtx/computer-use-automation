@@ -13,6 +13,9 @@ test-results/
 .env.*
 !.env.example
 
+# Confidential interview assignment — do not commit
+assignmentAComputerUseSystem.pdf
+
 # Runtime artifact store (the CLI's working directory)
 artifacts/
 
