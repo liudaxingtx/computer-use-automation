@@ -26,7 +26,7 @@ interface.ai 的 agent 要操作后台系统（银行/保险/医疗），唯一�
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt && playwright install chromium
-cp .env.example .env        # 填 DEEPSEEK_API_KEY 与 KIMI_API_KEY（可选，仅录制新 task 需要）
+cp .env.example .env        # 填 DECISION_LLM_API_KEY 与 VISION_LLM_API_KEY（可选，仅录制新 task 需要）
 python3 mock-app/server.py  # 本地目标应用（legacy 银行 mock，端口 9000）
 .venv/bin/python -m dashboard.server   # 控制台，端口 8123
 # 打开 http://localhost:8123

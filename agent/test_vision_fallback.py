@@ -25,7 +25,7 @@ with sync_playwright() as p:
 
     print("\n=== triggering K3 vision fallback ===")
     img = screenshot_b64(page)
-    note = llm.kimi_vision(img, _vision_prompt(TASK))
+    note = llm.vision(img, _vision_prompt(TASK))
     print(note)
 
     low = note.lower()

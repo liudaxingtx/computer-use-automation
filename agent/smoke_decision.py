@@ -1,5 +1,6 @@
-"""Quick smoke test: does DeepSeek v4-pro accept response_format json_object and
-return a clean decision dict for a hand-built page observation?"""
+"""Quick smoke test: does the configured decision LLM (DECISION_LLM_*) accept
+response_format json_object and return a clean decision dict for a hand-built
+page observation?"""
 from agent import llm
 
 messages = [
@@ -7,8 +8,8 @@ messages = [
     {"role": "user", "content": "TASK: search for member 1001\n\nINTERACTIVE ELEMENTS:\n[1] textbox \"\"\n[2] button \"SEARCH\"\n\nReturn your decision as a single JSON object."},
 ]
 
-d = llm.deepseek_decide(messages)
+d = llm.decide(messages)
 print("decision:", d)
 assert isinstance(d, dict), "expected dict"
 assert "action" in d and "kind" in d["action"], "missing action.kind"
-print("OK — DeepSeek structured decision works")
+print("OK — decision LLM structured output works")

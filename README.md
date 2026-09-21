@@ -34,7 +34,7 @@ pip install -r requirements.txt
 playwright install chromium
 
 # 2. Configure API keys (optional — only needed to *record new* tasks)
-cp .env.example .env      # fill in DEEPSEEK_API_KEY and KIMI_API_KEY
+cp .env.example .env      # fill in DECISION_LLM_API_KEY and VISION_LLM_API_KEY
 
 # 3. Start the local target app (a "legacy bank" mock, port 9000)
 python3 mock-app/server.py

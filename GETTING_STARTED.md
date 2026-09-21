@@ -42,19 +42,22 @@ You should see a dark dashboard titled **Automation Tasks** listing four pre-rec
 
 ## 3. Configuration (`.env`)
 
-Only two keys are required; the rest have defaults.
+Two LLM roles, both **provider-agnostic** — point each at any OpenAI-compatible endpoint (DeepSeek, Kimi/Moonshot, OpenAI, OpenRouter, a local vLLM, …). Nothing is hard-wired to a specific vendor; the defaults below are just examples so the project runs out of the box.
 
 | Variable | Required | What it does | Default |
 |---|---|---|---|
-| `DEEPSEEK_API_KEY` | ✅ | Drives discovery (observe → decide → act) | — |
-| `DEEPSEEK_BASE_URL` | — | OpenAI-compatible endpoint | `https://api.deepseek.com` |
-| `DEEPSEEK_MODEL` | — | Decision model | `deepseek-v4-pro` |
-| `KIMI_API_KEY` | ✅ | Vision fallback for image-only surfaces | — |
-| `KIMI_BASE_URL` | — | Use the China endpoint (the `.ai` one returns Invalid Auth) | `https://api.moonshot.cn` |
-| `KIMI_MODEL` | — | Vision model (reasoning model, `temperature=1`) | `kimi-k3` |
+| `DECISION_LLM_API_KEY` | ✅ | Drives discovery (observe → decide → act) | — |
+| `DECISION_LLM_BASE_URL` | — | OpenAI-compatible endpoint | `https://api.deepseek.com` |
+| `DECISION_LLM_MODEL` | — | Decision model | `deepseek-v4-pro` |
+| `DECISION_LLM_TEMPERATURE` | — | Sampling temperature | `0.2` |
+| `DECISION_LLM_JSON_MODE` | — | Send `response_format=json_object` (`1`/`0`) | `1` |
+| `VISION_LLM_API_KEY` | ✅ | Vision fallback for image-only surfaces | — |
+| `VISION_LLM_BASE_URL` | — | OpenAI-compatible endpoint (Kimi needs the `…/v1` suffix; the `.ai` domain returns Invalid Auth) | `https://api.moonshot.cn/v1` |
+| `VISION_LLM_MODEL` | — | Vision model | `kimi-k3` |
+| `VISION_LLM_TEMPERATURE` | — | Sampling temperature (kimi-k3 only accepts `1`) | `1` |
 | `MOCK_URL` | — | The target app under test | `http://localhost:9000/` |
 
-`DEEPSEEK_API_KEY` and `KIMI_API_KEY` come from the environment, never from git — `.env` is git-ignored.
+`DECISION_LLM_API_KEY` and `VISION_LLM_API_KEY` come from the environment, never from git — `.env` is git-ignored. Swap any `*_BASE_URL` / `*_MODEL` for your preferred provider; the code has no vendor-specific coupling.
 
 > **You only need the keys to *record new* tasks.** Viewing the seven pre-recorded tasks and replaying them (the core demo) needs **no keys at all** — replay is deterministic, no LLM in the loop. The pre-recorded tasks are committed to `evidence/artifact_*.json`, and the dashboard falls back to that committed seed when the git-ignored `artifacts/` working directory is absent (i.e. on a fresh clone).
 

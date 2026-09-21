@@ -1,6 +1,9 @@
-"""LLM client — DeepSeek (decision) and Kimi K3 (vision), both OpenAI-compatible.
+"""LLM client — two provider-agnostic roles: decision and vision.
 
-One thin httpx helper for both endpoints; no third-party SDK needed.
+Both roles talk to any OpenAI-compatible endpoint through one thin httpx helper;
+no third-party SDK, and nothing here is hard-wired to a specific vendor. Each
+role's endpoint / model / parameters come from `agent.config` (`DECISION_LLM_*`
+and `VISION_LLM_*`).
 """
 import json
 import re
@@ -38,29 +41,36 @@ def _parse_json(text: str) -> dict:
         raise
 
 
-def deepseek_decide(messages: list, temperature: float = 0.2, max_tokens: int = 8192) -> dict:
-    """Call DeepSeek for a structured decision. Returns a parsed JSON dict.
+def decide(messages: list, temperature: float | None = None,
+           max_tokens: int | None = None) -> dict:
+    """Ask the decision LLM for the next action. Returns a parsed JSON dict.
 
-    deepseek-v4-pro is a *reasoning* model: it emits `reasoning_content` (the
-    monologue) plus `content` (the answer). The monologue can be long — on a
-    complex page with accumulated history it can consume the entire output
-    budget, leaving `content` empty. Two mitigations:
-      1. a generous output budget (8192) so the monologue rarely exhausts it;
-      2. when `content` is empty, fall back to parsing the JSON out of
-         `reasoning_content` (which usually still contains it).
-    Retries with a short backoff turn any residual drift into a self-heal.
+    Provider-agnostic: endpoint / model / params come from `DECISION_LLM_*`.
+    Two defensive behaviours that make this robust across vendors:
+
+      * reasoning models (DeepSeek, Kimi, o-series, …) emit `reasoning_content`
+        (the monologue) *plus* `content` (the answer). A long monologue can
+        consume the whole output budget and leave `content` empty, so we fall
+        back to parsing the JSON out of `reasoning_content`.
+      * a short backoff retry turns any transient drift into a self-heal.
     """
+    temperature = config.DECISION_LLM_TEMPERATURE if temperature is None else temperature
+    max_tokens = config.DECISION_LLM_MAX_TOKENS if max_tokens is None else max_tokens
+
     last_err: Exception | None = None
     for attempt in range(3):
-        payload = {
-            "model": config.DEEPSEEK_MODEL,
+        payload: dict = {
+            "model": config.DECISION_LLM_MODEL,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
-            "response_format": {"type": "json_object"},
         }
+        # json_object is broadly supported by OpenAI-compatible APIs, but a few
+        # providers don't accept it — disable via DECISION_LLM_JSON_MODE=0.
+        if config.DECISION_LLM_JSON_MODE:
+            payload["response_format"] = {"type": "json_object"}
         try:
-            data = _post(config.DEEPSEEK_BASE_URL, config.DEEPSEEK_API_KEY, payload)
+            data = _post(config.DECISION_LLM_BASE_URL, config.DECISION_LLM_API_KEY, payload)
             msg = data["choices"][0]["message"]
             content = msg.get("content") or ""
             if not content.strip():
@@ -75,10 +85,16 @@ def deepseek_decide(messages: list, temperature: float = 0.2, max_tokens: int = 
     raise RuntimeError(f"decision LLM failed after 3 attempts: {last_err}")
 
 
-def kimi_vision(image_b64: str, prompt: str, mime: str = "image/png") -> str:
-    """Call Kimi K3 to *understand* a screenshot. Returns the final answer text."""
+def vision(image_b64: str, prompt: str, mime: str = "image/png") -> str:
+    """Ask the vision LLM to *understand* a screenshot. Returns the answer text.
+
+    Provider-agnostic: endpoint / model / params come from `VISION_LLM_*`.
+    Reasoning models put the final answer in `content` and the monologue in
+    `reasoning_content`; non-reasoning models just have `content` — so prefer
+    `content` and fall back to `reasoning_content`.
+    """
     payload = {
-        "model": config.KIMI_MODEL,
+        "model": config.VISION_LLM_MODEL,
         "messages": [
             {
                 "role": "user",
@@ -88,13 +104,9 @@ def kimi_vision(image_b64: str, prompt: str, mime: str = "image/png") -> str:
                 ],
             }
         ],
-        # kimi-k3 is a reasoning model: it only accepts temperature=1, and its
-        # reasoning monologue can consume most of the budget, so leave headroom
-        # for the final `content` answer (image CAPTCHAs especially).
-        "temperature": 1,
-        "max_tokens": 8192,
+        "temperature": config.VISION_LLM_TEMPERATURE,
+        "max_tokens": config.VISION_LLM_MAX_TOKENS,
     }
-    data = _post(config.KIMI_BASE_URL, config.KIMI_API_KEY, payload)
+    data = _post(config.VISION_LLM_BASE_URL, config.VISION_LLM_API_KEY, payload)
     msg = data["choices"][0]["message"]
-    # K3 is a reasoning model: content holds the final answer, reasoning_content the monologue.
     return msg.get("content") or msg.get("reasoning_content") or ""

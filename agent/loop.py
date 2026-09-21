@@ -164,16 +164,16 @@ def run_discovery(page, task: str, max_steps: int = 20, verbose: bool = True,
         vision_note = ""
         if not obs["elements"]:
             # Non-semantic surface: no interactive elements in the a11y tree.
-            # Fall back to K3 vision so the decision model still understands the page.
+            # Fall back to the vision model so the decision model still understands the page.
             img = screenshot_b64(page)
-            vision_note = llm.kimi_vision(img, _vision_prompt(task))
+            vision_note = llm.vision(img, _vision_prompt(task))
             if verbose:
                 print(f"[step {step_no}] (vision fallback) {vision_note[:140]}")
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": _user_message(task, obs, history, vision_note)},
         ]
-        decision = llm.deepseek_decide(messages)
+        decision = llm.decide(messages)
 
         action = decision.get("action", {})
         kind = str(action.get("kind", "")).lower()
