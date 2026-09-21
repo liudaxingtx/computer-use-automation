@@ -36,7 +36,7 @@ python3 mock-app/server.py
 # 5. Open http://localhost:8123 in a browser
 ```
 
-You should see a dark dashboard titled **Automation Tasks** listing four pre-recorded tasks.
+You should see a dark dashboard titled **Automation Tasks** listing seven pre-recorded tasks. A separate, minimal **Task Runner** for end users — pick a task from a dropdown → fill in its inputs (each shows its name, meaning, and type) → run → see the result — lives at `http://localhost:8123/user`.
 
 ---
 

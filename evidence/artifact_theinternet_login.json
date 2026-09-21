@@ -13,13 +13,13 @@
       "name": "username",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Login username — e.g. tomsmith"
     },
     {
       "name": "password",
-      "type": "str",
+      "type": "password",
       "required": true,
-      "description": ""
+      "description": "Login password"
     }
   ],
   "outputs": [
@@ -67,6 +67,7 @@
         "name": "",
         "field": "username",
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "Type the username into the first textbox."
       },
@@ -85,6 +86,7 @@
         "name": "",
         "field": "password",
         "ordinal": 2,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The username is already filled in. Type the password into the password textbox next."
       },
@@ -103,6 +105,7 @@
         "name": "Login",
         "field": "",
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "Fill in the login form has been done. The next step is to submit by clicking the Login button."
       },

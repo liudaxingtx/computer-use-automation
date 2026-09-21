@@ -7,12 +7,13 @@
     "domain": "localhost:9000",
     "created_at": "2026-09-19T18:38:42.070682Z"
   },
+  "start_url": "",
   "inputs": [
     {
       "name": "member_id",
       "type": "str",
       "required": true,
-      "description": "Member ID to look up"
+      "description": "Member account ID to look up — e.g. 1001"
     }
   ],
   "outputs": [
@@ -54,7 +55,9 @@
         "strategy": "accessibility",
         "role": "textbox",
         "name": "",
+        "field": null,
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The member ID field is currently empty. I need to enter '1001' before clicking SEARCH."
       },
@@ -71,7 +74,9 @@
         "strategy": "accessibility",
         "role": "button",
         "name": "SEARCH",
+        "field": null,
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "Member ID 1001 is already entered in the textbox; click SEARCH to look up the member and view account detail."
       },

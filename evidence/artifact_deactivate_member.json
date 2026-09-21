@@ -4,22 +4,25 @@
     "version": "1.0.0",
     "description": "Look up a member by ID and deactivate their account.",
     "surface": "browser",
-    "created_at": "2026-09-19T15:08:05.627552Z",
-    "domain": "localhost:9000"
+    "domain": "localhost:9000",
+    "created_at": "2026-09-19T15:08:05.627552Z"
   },
+  "start_url": "",
   "inputs": [
     {
       "name": "member_id",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Member account ID to deactivate — e.g. 1001"
     }
   ],
   "outputs": [
     {
       "name": "status",
       "type": "str",
-      "source": "result page"
+      "source": "result page",
+      "label": "",
+      "extract": ""
     }
   ],
   "checkpoint": "result page shows SUCCESS",
@@ -43,7 +46,9 @@
         "strategy": "accessibility",
         "role": "textbox",
         "name": "",
+        "field": null,
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The page has a textbox for member ID and a SEARCH button. I should first type the member ID 1001 into the textbox before clicking search."
       },
@@ -60,7 +65,9 @@
         "strategy": "accessibility",
         "role": "button",
         "name": "SEARCH",
+        "field": null,
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "Member ID 1001 has been entered into the textbox; the next step is to click the SEARCH button to retrieve the member detail."
       },
@@ -77,7 +84,9 @@
         "strategy": "accessibility",
         "role": "link",
         "name": "DEACTIVATE ACCOUNT",
+        "field": null,
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The member detail for 1001 is visible with status ACTIVE. The next step is to click the 'DEACTIVATE ACCOUNT' link to initiate deactivation."
       },
@@ -94,7 +103,9 @@
         "strategy": "accessibility",
         "role": "link",
         "name": "CONFIRM",
+        "field": null,
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "We are on the confirmation page for deactivating member 1001. Click CONFIRM to complete deactivation."
       },

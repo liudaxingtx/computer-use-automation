@@ -13,13 +13,13 @@
       "name": "user-name",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Store username — e.g. standard_user"
     },
     {
       "name": "password",
-      "type": "str",
+      "type": "password",
       "required": true,
-      "description": ""
+      "description": "Store password — e.g. secret_sauce"
     }
   ],
   "outputs": [],
@@ -41,6 +41,7 @@
         "name": "Username",
         "field": "user-name",
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "Start by typing the username into the Username field."
       },
@@ -59,6 +60,7 @@
         "name": "Password",
         "field": "password",
         "ordinal": 2,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The username is already filled. Next, type the password into the password field."
       },
@@ -77,6 +79,7 @@
         "name": "Login",
         "field": "login-button",
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "Credentials are already entered. Click the Login button to submit."
       },

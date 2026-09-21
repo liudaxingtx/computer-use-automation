@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT))
 from agent.observability import ARTIFACT_DIR, EVIDENCE_DIR, RUNS_DIR, ReplayStore  # noqa: E402
 
 INDEX = ROOT / "dashboard" / "index.html"
+USER_INDEX = ROOT / "dashboard" / "user.html"
 SHOTS = ROOT / "dashboard" / "screenshots"
 PORT = 8123
 MOCK_URL = "http://localhost:9000/"
@@ -389,6 +390,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
             self._send(INDEX.read_bytes(), "text/html; charset=utf-8")
+        elif path in ("/user", "/user.html"):
+            self._send(USER_INDEX.read_bytes(), "text/html; charset=utf-8")
         elif path == "/api/tasks":
             self._json(build_tasks())
         elif path == "/api/runs":

@@ -102,6 +102,7 @@ scripts/      one-command tests, screenshot/evidence generators, artifact helper
 - **Observability** — append-only run store, success telemetry, a failure inbox, and a replay-error → repair → re-verify loop.
 - **Safety** — action allowlist (enforced in discovery *and* replay), AES-256-GCM encryption of customer inputs at rest, and a human handoff state machine.
 - **Task dashboard** — grouped by domain, per-task locator detail + screenshots, Swagger-style invoke, call log, delete (with confirm).
+- **User-facing Task Runner** — a minimal end-user page (`/user`): pick a task from a domain-grouped dropdown, see its input params (name + meaning + type, passwords masked), run it, and read the three-state result with extracted data.
 
 ---
 

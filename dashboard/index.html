@@ -144,6 +144,10 @@
     font-weight: 700; font-size: 13px; padding: 8px 16px; border-radius: 9px; cursor: pointer;
     box-shadow: 0 0 16px rgba(56,189,248,0.4); white-space: nowrap; }
   button.calllog:hover { filter: brightness(1.08); }
+  a.userview { background: var(--panel-2); color: var(--cyan); border: 1px solid rgba(56,189,248,0.35);
+    font-weight: 700; font-size: 13px; padding: 8px 16px; border-radius: 9px; cursor: pointer;
+    text-decoration: none; white-space: nowrap; }
+  a.userview:hover { border-color: rgba(56,189,248,0.6); box-shadow: 0 0 12px rgba(56,189,248,0.25); }
   .clog-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .clog-stat { font-size: 13px; color: var(--dim); }
   .clog-stat b { color: var(--txt); font-weight: 700; }
@@ -234,6 +238,7 @@
     </div>
     <button class="register" onclick="openDiscover()">+ Register task</button>
     <button class="calllog" onclick="openCallLog()">Call log</button>
+    <a class="userview" href="/user">User view →</a>
   </header>
   <div id="domains"></div>
 </div>

@@ -1,0 +1,31 @@
+{
+  "capability": "lookup_member",
+  "version": "1.0.0",
+  "inputs": {
+    "member_id": "enc:6dNrMTPeVIsaPIWjA4WewM79SPTcW3OoqDxA/bBif4c="
+  },
+  "result": "success",
+  "outputs": {
+    "name": "JOHN SMITH",
+    "status": "ACTIVE",
+    "balance": "$4,250.00"
+  },
+  "diagnostic": "",
+  "steps": [
+    {
+      "step": 1,
+      "action": "type",
+      "ok": true,
+      "outcome": null
+    },
+    {
+      "step": 2,
+      "action": "click",
+      "ok": true,
+      "outcome": null
+    }
+  ],
+  "screenshot": null,
+  "started_at": "2026-09-21T00:50:42.376002Z",
+  "duration_ms": 224
+}

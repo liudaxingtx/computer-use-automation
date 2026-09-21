@@ -13,31 +13,31 @@
       "name": "user-name",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Store username — e.g. standard_user"
     },
     {
       "name": "password",
-      "type": "str",
+      "type": "password",
       "required": true,
-      "description": ""
+      "description": "Store password — e.g. secret_sauce"
     },
     {
       "name": "firstName",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Customer first name"
     },
     {
       "name": "lastName",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Customer last name"
     },
     {
       "name": "postalCode",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Shipping postal / ZIP code"
     }
   ],
   "outputs": [

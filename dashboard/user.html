@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Runner</title>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --panel: #111826;
+    --panel-2: #0f1622;
+    --line: rgba(120, 160, 220, 0.12);
+    --txt: #d7e2f0;
+    --dim: #7d8aa0;
+    --cyan: #38bdf8;
+    --green: #34d399;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --violet: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 70% -10%, #13233b 0%, transparent 60%),
+                radial-gradient(900px 500px at 0% 110%, #1a1440 0%, transparent 55%),
+                var(--bg);
+    color: var(--txt);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh; padding: 28px 20px 60px; line-height: 1.5;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+
+  header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 24px; }
+  .logo { width: 40px; height: 40px; border-radius: 11px; flex: 0 0 auto;
+    background: linear-gradient(135deg, var(--cyan), var(--violet));
+    box-shadow: 0 0 18px rgba(56,189,248,0.55); display: grid; place-items: center;
+    font-weight: 700; color: #06121f; font-size: 17px; }
+  h1 { font-size: 20px; font-weight: 700; }
+  .sub { color: var(--dim); font-size: 12.5px; }
+  a.admin { margin-left: auto; color: var(--dim); font-size: 12.5px; text-decoration: none;
+    border: 1px solid var(--line); padding: 6px 12px; border-radius: 8px; }
+  a.admin:hover { color: var(--txt); border-color: rgba(120,160,220,0.4); }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 22px; }
+  label.chooser { font-size: 11px; text-transform: uppercase; letter-spacing: 1.3px;
+    color: var(--dim); display: block; margin-bottom: 8px; }
+  select { width: 100%; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--txt); border-radius: 9px; padding: 11px 13px; font-size: 15px; outline: none; }
+  select:focus { border-color: rgba(56,189,248,0.5); box-shadow: 0 0 0 2px rgba(56,189,248,0.15); }
+
+  .taskinfo { margin-top: 16px; display: none; }
+  .taskinfo .tname { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .badge { font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.6px; }
+  .badge.verified { color: var(--green); background: rgba(52,211,153,0.12); }
+  .badge.domain { color: var(--cyan); background: rgba(56,189,248,0.12); }
+  .tdesc { color: var(--dim); font-size: 13px; margin-top: 6px; }
+
+  .params { margin-top: 18px; display: flex; flex-direction: column; gap: 13px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field .flabel { display: flex; align-items: center; gap: 8px; }
+  .field label { font-size: 13px; font-weight: 600; }
+  .type { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.5px; color: var(--violet);
+    background: rgba(167,139,250,0.12); border: 1px solid rgba(167,139,250,0.3); }
+  .req { color: var(--red); }
+  .field .hint { font-size: 11.5px; color: var(--dim); }
+  .field input { background: var(--panel-2); border: 1px solid var(--line); color: var(--txt);
+    border-radius: 8px; padding: 10px 12px; font-size: 14px; width: 100%; outline: none; }
+  .field input:focus { border-color: rgba(56,189,248,0.5); box-shadow: 0 0 0 2px rgba(56,189,248,0.15); }
+
+  button.run { margin-top: 20px; width: 100%; background: linear-gradient(135deg, var(--cyan), #2563eb);
+    color: #06121f; border: none; font-weight: 700; font-size: 14px; padding: 12px 20px;
+    border-radius: 9px; cursor: pointer; box-shadow: 0 0 16px rgba(56,189,248,0.4); }
+  button.run:hover { filter: brightness(1.08); }
+  button.run:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .result { margin-top: 16px; border-radius: 12px; padding: 16px 18px; border: 1px solid var(--line); display: none; }
+  .result.success { display: block; border-color: rgba(52,211,153,0.4); background: rgba(52,211,153,0.06); }
+  .result.failure { display: block; border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.06); }
+  .result.business_outcome { display: block; border-color: rgba(251,191,36,0.4); background: rgba(251,191,36,0.06); }
+  .rhead { display: flex; align-items: center; gap: 10px; }
+  .rlabel { font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .result.success .rlabel { color: var(--green); }
+  .result.failure .rlabel { color: var(--red); }
+  .result.business_outcome .rlabel { color: var(--amber); }
+  .rtime { margin-left: auto; font-size: 12px; color: var(--dim); font-family: ui-monospace, Menlo, monospace; }
+  .rdiag { color: var(--dim); font-size: 12.5px; margin-top: 5px; }
+  .result .outputs { margin-top: 12px; }
+  .olabel { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.7px; color: var(--dim); margin-bottom: 6px; }
+  .result pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+    color: var(--violet); overflow-x: auto; white-space: pre; }
+  .result img { margin-top: 12px; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); cursor: zoom-in; }
+
+  .empty { color: var(--dim); font-size: 13px; padding: 20px 0; text-align: center; }
+  .lightbox { position: fixed; inset: 0; background: rgba(3,6,11,0.88); display: none;
+    align-items: center; justify-content: center; z-index: 300; padding: 30px; cursor: zoom-out; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">R</div>
+    <div>
+      <h1>Task Runner</h1>
+      <div class="sub">Pick a task, fill in the inputs, run it</div>
+    </div>
+    <a class="admin" href="/">Admin console</a>
+  </header>
+
+  <div class="card">
+    <label class="chooser" for="taskSel">Choose a task</label>
+    <select id="taskSel">
+      <option value="">— select a task —</option>
+    </select>
+
+    <div class="taskinfo" id="taskinfo">
+      <div class="tname">
+        <span id="tName"></span>
+        <span class="badge domain" id="tDomain"></span>
+        <span class="badge verified" id="tVerified"></span>
+      </div>
+      <div class="tdesc" id="tDesc"></div>
+      <div class="params" id="params"></div>
+      <button class="run" id="runBtn" onclick="runTask()">▶ Run task</button>
+      <div class="result" id="result"></div>
+    </div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox"><img id="lbImg" alt=""></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+const RESULT = { success: 'Success', business_outcome: 'Business outcome', failure: 'Failure' };
+
+// 全角 → 半角规范化（中文输入法常见坑）
+function normalizeInput(s) {
+  return String(s)
+    .replace(/\u3000/g, ' ')
+    .replace(/[\uff01-\uff5e]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+}
+
+let TASKS = [];
+
+async function loadTasks() {
+  const res = await fetch('/api/tasks');
+  const data = await res.json();
+  TASKS = data.tasks || [];
+
+  // group by domain for the dropdown
+  const byDomain = {};
+  for (const t of TASKS) {
+    const d = t.domain || '(unknown)';
+    (byDomain[d] ||= []).push(t);
+  }
+  const sel = $('#taskSel');
+  sel.innerHTML = '<option value="">— select a task —</option>' +
+    Object.keys(byDomain).sort().map(d =>
+      `<optgroup label="${esc(d)}">` +
+      byDomain[d].map(t => `<option value="${esc(t.name)}">${esc(t.name)}</option>`).join('') +
+      `</optgroup>`
+    ).join('');
+  sel.onchange = onSelect;
+}
+
+function onSelect() {
+  const name = $('#taskSel').value;
+  const t = TASKS.find(x => x.name === name);
+  $('#result').className = 'result';
+  $('#result').innerHTML = '';
+  if (!t) { $('#taskinfo').style.display = 'none'; return; }
+
+  $('#tName').textContent = t.name;
+  $('#tDomain').textContent = t.domain || 'unknown';
+  $('#tVerified').textContent = t.verified ? 'verified' : 'unverified';
+  $('#tVerified').className = 'badge verified';
+  $('#tDesc').textContent = t.description || '';
+
+  const inputs = t.inputs || [];
+  $('#params').innerHTML = inputs.length
+    ? inputs.map(i => `
+      <div class="field">
+        <div class="flabel">
+          <label>${esc(i.name)}${i.required ? ' <span class="req">*</span>' : ''}</label>
+          <span class="type">${esc(i.type || 'str')}</span>
+        </div>
+        ${i.description ? `<span class="hint">${esc(i.description)}</span>` : ''}
+        <input type="${i.type === 'password' ? 'password' : 'text'}" data-input="${esc(i.name)}" placeholder="${esc(i.type === 'password' ? '••••••' : '')}">
+      </div>`).join('')
+    : '<div class="empty">This task takes no inputs.</div>';
+
+  $('#taskinfo').style.display = 'block';
+  $('#runBtn').disabled = false;
+}
+
+async function runTask() {
+  const name = $('#taskSel').value;
+  if (!name) return;
+  const inputs = {};
+  document.querySelectorAll('[data-input]').forEach(el => {
+    const v = normalizeInput(el.value).trim();
+    if (v !== '') inputs[el.dataset.input] = v;
+  });
+  const btn = $('#runBtn');
+  btn.disabled = true; btn.textContent = 'Running…';
+  const res = await fetch('/api/run', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task: name, inputs })
+  });
+  const r = await res.json();
+  btn.disabled = false; btn.textContent = '▶ Run task';
+  const box = $('#result');
+  if (r.error) { box.className = 'result failure'; box.innerHTML = `<div class="rlabel">Error</div><div class="rdiag">${esc(r.error)}</div>`; return; }
+  box.className = 'result ' + r.result;
+  const outputsHtml = (r.outputs && Object.keys(r.outputs).length)
+    ? `<div class="outputs"><div class="olabel">Result data</div><pre>${esc(JSON.stringify(r.outputs, null, 2))}</pre></div>` : '';
+  box.innerHTML = `
+    <div class="rhead">
+      <span class="rlabel">${RESULT[r.result] || r.result}</span>
+      <span class="rtime">${r.duration_ms != null ? r.duration_ms + ' ms' : ''}</span>
+    </div>
+    ${r.diagnostic ? `<div class="rdiag">${esc(r.diagnostic)}</div>` : ''}
+    ${outputsHtml}
+    ${r.screenshot ? `<img src="${esc(r.screenshot)}" onerror="this.style.display='none'">` : ''}`;
+}
+
+document.addEventListener('click', e => {
+  const img = e.target.closest('.result img');
+  if (img) { $('#lbImg').src = img.src; $('#lightbox').classList.add('open'); }
+});
+$('#lightbox').addEventListener('click', () => $('#lightbox').classList.remove('open'));
+
+loadTasks();
+</script>
+</body>
+</html>

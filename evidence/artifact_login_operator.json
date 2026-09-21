@@ -13,13 +13,13 @@
       "name": "username",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Login username"
     },
     {
       "name": "password",
-      "type": "str",
+      "type": "password",
       "required": true,
-      "description": ""
+      "description": "Login password"
     }
   ],
   "outputs": [
@@ -56,6 +56,7 @@
         "name": "",
         "field": "username",
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The login form has two textboxes. The first textbox (index 2) is for username, so I will type the username into it."
       },
@@ -74,6 +75,7 @@
         "name": "",
         "field": "password",
         "ordinal": 2,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The username was typed into the first textbox (index 2). The next field to fill is the password textbox, which is index 3 in the menu, so type the password there."
       },
@@ -92,6 +94,7 @@
         "name": "LOGIN",
         "field": "",
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "Credentials entered; submit the login form by clicking LOGIN."
       },

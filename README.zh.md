@@ -29,7 +29,7 @@ pip install -r requirements.txt && playwright install chromium
 cp .env.example .env        # 填 DECISION_LLM_API_KEY 与 VISION_LLM_API_KEY（可选，仅录制新 task 需要）
 python3 mock-app/server.py  # 本地目标应用（legacy 银行 mock，端口 9000）
 .venv/bin/python -m dashboard.server   # 控制台，端口 8123
-# 打开 http://localhost:8123
+# 打开 http://localhost:8123（管理台） 或 http://localhost:8123/user（用户端 Task Runner）
 ```
 
 查看与回放预录制的 task **不需要任何 API key**——回放是确定性代码、无 LLM 参与；只有录制新 task 才需要 key。
@@ -81,6 +81,7 @@ scripts/      一键测试、截图/证据生成、artifact 辅助脚本
 - **可观测性** —— 只追加的运行存储、成功遥测、失败收件箱、replay 出错 → 修复 → 复验闭环。
 - **安全** —— 动作白名单（发现和回放都执行）、客户输入 AES-256-GCM 静态加密、人工接管状态机。
 - **task 控制台** —— 按域名分组、逐 task 定位器细节 + 截图、Swagger 式调用、调用日志、删除（带确认）。
+- **用户端 Task Runner** —— 极简最终用户页（`/user`）：从按域名分组的下拉框选 task → 看输入参数（名称 + 意义 + 类型，密码掩码）→ 运行 → 看三态结果与提取数据。
 
 ## 测试
 

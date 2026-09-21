@@ -13,19 +13,19 @@
       "name": "username",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Desired login username"
     },
     {
       "name": "password",
-      "type": "str",
+      "type": "password",
       "required": true,
-      "description": ""
+      "description": "Password (at least 6 characters)"
     },
     {
       "name": "email",
       "type": "str",
       "required": true,
-      "description": ""
+      "description": "Operator email address"
     }
   ],
   "outputs": [
@@ -85,6 +85,7 @@
         "name": "",
         "field": "username",
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The form has three textboxes in order: username, password, email. I will type the username into the first textbox (index 2) first."
       },
@@ -103,6 +104,7 @@
         "name": "",
         "field": "password",
         "ordinal": 2,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "Username carol is already entered. Next, type the password into the password textbox, which is the second unnamed textbox (index 3)."
       },
@@ -121,6 +123,7 @@
         "name": "",
         "field": "email",
         "ordinal": 3,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "The email field is the remaining empty textbox (index 4). Type the email address before submitting."
       },
@@ -139,6 +142,7 @@
         "name": "REGISTER",
         "field": "",
         "ordinal": 1,
+        "name_ordinal": null,
         "value": null,
         "reasoning": "All three fields are filled. The next step is to submit the registration form by clicking the REGISTER button."
       },
