@@ -182,6 +182,7 @@ def _execute_replay(cap, inputs: dict, name: str, echo_inputs: bool = True,
         "diagnostic": run.diagnostic,
         "outputs": run.outputs,
         "screenshot": f"/api/screenshots/{shot}",
+        "steps": run.steps,
         "inputs": inputs if echo_inputs else None,
         "duration_ms": run.duration_ms,
     }

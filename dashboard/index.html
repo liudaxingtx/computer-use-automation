@@ -332,6 +332,18 @@
   </div>
 </div>
 
+<!-- replay result modal -->
+<div class="overlay" id="replayoverlay">
+  <div class="modal" id="replaymodal" style="max-width:820px">
+    <div class="mhead">
+      <span class="mname">Replay result</span>
+      <button class="close" onclick="$('#replayoverlay').classList.remove('open')">✕</button>
+    </div>
+    <div class="mdesc" id="replaySub"></div>
+    <div id="replayBody"></div>
+  </div>
+</div>
+
 <script>
 const $ = s => document.querySelector(s);
 const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2600); };
@@ -711,7 +723,7 @@ async function replayRun(runId, btn) {
     });
     const r = await res.json();
     if (r.error) { toast('Error: ' + r.error); return; }
-    toast(`Replayed → ${RESULT[r.result] || r.result} (${r.duration_ms ?? '?'}ms)`);
+    renderReplayResult(r);
     const d = await (await fetch('/api/stats')).json();
     renderStats(d);
   } catch (e) {
@@ -721,18 +733,58 @@ async function replayRun(runId, btn) {
   }
 }
 
-async function optimizeTask(name) {
-  const instruction = $('#optInstruction').value.trim();
-  if (!instruction) { toast('Describe the change first'); return; }
-  const btn = document.querySelector('.opt-btn');
-  const box = $('#optResult');
-  btn.disabled = true; btn.textContent = 'Optimizing…';
-  box.className = 'result'; box.style.display = 'block';
-  box.innerHTML = '<div class="rdiag">Optimizing in the background — you can close this page; the AI keeps working and you will be notified when it finishes.</div>';
+function renderReplayResult(r) {
+  const isFailure = r.result === 'failure';
+  const stepsHtml = (r.steps && r.steps.length) ? `
+    <div class="msection">
+      <h3>Execution steps</h3>
+      ${r.steps.map((s, i) => {
+        const failed = s.ok === false;
+        const color = failed ? 'var(--red)' : (s.outcome ? 'var(--amber)' : 'var(--green)');
+        const label = failed ? 'FAILED' : (s.outcome ? esc(s.outcome) : 'ok');
+        const err = s.error ? ` — ${esc(s.error)}` : '';
+        return `<div class="step" style="border-left-color:${color}">
+          <div class="shead"><span class="snum">step ${i + 1}</span><span class="saction">${esc(s.action)}</span></div>
+          <div class="loc">${label}${err}</div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  const outputsHtml = (r.outputs && Object.keys(r.outputs).length)
+    ? `<div class="msection"><h3>Result data</h3><pre style="background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--violet);overflow-x:auto;white-space:pre">${esc(JSON.stringify(r.outputs, null, 2))}</pre></div>` : '';
+
+  $('#replaySub').innerHTML = `
+    <span class="pill ${r.result}">${RESULT[r.result] || r.result}</span>
+    <span class="ver">${esc(r.task || '')}</span>
+    <span class="rtime">${r.duration_ms != null ? r.duration_ms + ' ms' : ''}</span>`;
+
+  $('#replayBody').innerHTML = `
+    ${r.diagnostic ? `<div class="rdiag" style="display:block;margin:14px 0">${esc(r.diagnostic)}</div>` : ''}
+    ${outputsHtml}
+    ${r.screenshot ? `<div class="msection"><h3>${isFailure ? 'Failure screenshot — where it stopped' : 'Screenshot'}</h3><div class="shot"><img src="${esc(r.screenshot)}" alt="${esc(r.result)}"></div></div>` : ''}
+    ${stepsHtml}
+    <div class="msection">
+      <h3>AI — optimize this task</h3>
+      <div class="mdesc">Describe the fix in plain English; the AI tunes the artifact and re-saves it (runs in the background — you'll be notified when it finishes).</div>
+      <div class="opt-row">
+        <input type="text" id="replayOptInstruction" placeholder="e.g. ACCESS DENIED is a business rule, not a failure — move it to business_outcomes">
+        <button class="opt-btn" onclick="optimizeFromReplay('${esc(r.task || '')}')">✨ Optimize</button>
+      </div>
+      <div class="result" id="replayOptResult"></div>
+    </div>`;
+
+  $('#replayoverlay').classList.add('open');
+}
+
+// pending optimize jobs -> their UI callbacks, so a landing job can restore the
+// right button and refresh the right view (task modal or replay modal).
+const OPT_UI = {};
+
+async function doOptimize(task, instruction, btn, box, onDone) {
   try {
     const res = await fetch('/api/optimize', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task: name, instruction })
+      body: JSON.stringify({ task, instruction })
     });
     const r = await res.json();
     if (r.error) {
@@ -741,13 +793,42 @@ async function optimizeTask(name) {
       box.innerHTML = `<div class="rlabel">Error</div><div class="rdiag">${esc(r.error)}</div>`;
       return;
     }
-    $('#optInstruction').value = '';
+    OPT_UI[r.job_id] = { btn, box, onDone };
     refreshJobs();  // register the new job; the global poller reports completion
   } catch (e) {
     btn.disabled = false; btn.textContent = '✨ Optimize';
     box.className = 'result'; box.style.display = 'none';
     toast('Error: ' + String(e));
   }
+}
+
+async function optimizeTask(name) {
+  const instruction = $('#optInstruction').value.trim();
+  if (!instruction) { toast('Describe the change first'); return; }
+  const btn = document.querySelector('#modal .opt-btn');
+  const box = $('#optResult');
+  btn.disabled = true; btn.textContent = 'Optimizing…';
+  box.className = 'result'; box.style.display = 'block';
+  box.innerHTML = '<div class="rdiag">Optimizing in the background — you can close this page; the AI keeps working and you will be notified when it finishes.</div>';
+  $('#optInstruction').value = '';
+  doOptimize(name, instruction, btn, box, () => {
+    if ($('#overlay').classList.contains('open') && currentTaskName === name) openTask(name);
+  });
+}
+
+function optimizeFromReplay(name) {
+  const instruction = $('#replayOptInstruction').value.trim();
+  if (!instruction) { toast('Describe the change first'); return; }
+  const btn = document.querySelector('#replayBody .opt-btn');
+  const box = $('#replayOptResult');
+  btn.disabled = true; btn.textContent = 'Optimizing…';
+  box.className = 'result'; box.style.display = 'block';
+  box.innerHTML = '<div class="rdiag">Optimizing in the background — you will be notified when it finishes.</div>';
+  $('#replayOptInstruction').value = '';
+  doOptimize(name, instruction, btn, box, (changed, r) => {
+    box.className = 'result success';
+    box.innerHTML = `<div class="rlabel">Optimized</div><div class="rdiag">${esc(changed)}${r && r.explanation ? ' — ' + esc(r.explanation) : ''}</div>`;
+  });
 }
 
 // Poll optimize jobs and surface completion — even if the detail modal is closed
@@ -768,24 +849,28 @@ async function refreshJobs() {
     for (const j of jobs) {
       if (j.status === 'running' || JOBS.notified.has(j.job_id)) continue;
       JOBS.notified.add(j.job_id);
-      const modalOpen = $('#overlay').classList.contains('open');
       if (j.status === 'done') {
         const r = j.result || {};
         const changed = (r.changed && r.changed.length) ? r.changed.join(', ') : 'nothing';
         toast(`✨ ${j.name} optimized: ${changed}`);
-        if (modalOpen && currentTaskName === j.name) {
-          const btn = document.querySelector('.opt-btn');
+        const ui = OPT_UI[j.job_id];
+        if (ui) {
+          ui.btn.disabled = false; ui.btn.textContent = '✨ Optimize';
+          if (ui.onDone) ui.onDone(changed, r);
+          delete OPT_UI[j.job_id];
+        } else if ($('#overlay').classList.contains('open') && currentTaskName === j.name) {
+          const btn = document.querySelector('#modal .opt-btn');
           if (btn) { btn.disabled = false; btn.textContent = '✨ Optimize'; }
           openTask(j.name);  // refresh so the updated outputs/checkpoint show
         }
       } else if (j.status === 'error') {
         toast(`Optimize failed for ${j.name}: ${j.error || ''}`);
-        if (modalOpen && currentTaskName === j.name) {
-          const btn = document.querySelector('.opt-btn');
-          if (btn) { btn.disabled = false; btn.textContent = '✨ Optimize'; }
-          const box = $('#optResult');
-          box.className = 'result failure';
-          box.innerHTML = `<div class="rlabel">Failed</div><div class="rdiag">${esc(j.error || '')}</div>`;
+        const ui = OPT_UI[j.job_id];
+        if (ui) {
+          ui.btn.disabled = false; ui.btn.textContent = '✨ Optimize';
+          ui.box.className = 'result failure';
+          ui.box.innerHTML = `<div class="rlabel">Failed</div><div class="rdiag">${esc(j.error || '')}</div>`;
+          delete OPT_UI[j.job_id];
         }
       }
     }

@@ -64,9 +64,7 @@
     {
       "text": "USERNAME TAKEN",
       "label": "username already registered"
-    }
-  ],
-  "failure_patterns": [
+    },
     {
       "text": "INVALID PASSWORD",
       "label": "password too short"
@@ -76,6 +74,7 @@
       "label": "missing required field"
     }
   ],
+  "failure_patterns": [],
   "steps": [
     {
       "action": "type",

@@ -23,14 +23,13 @@
     {
       "text": "NO SUCH MEMBER",
       "label": "member not found"
-    }
-  ],
-  "failure_patterns": [
+    },
     {
       "text": "ACCESS DENIED",
       "label": "permission denied"
     }
   ],
+  "failure_patterns": [],
   "steps": [
     {
       "action": "type",

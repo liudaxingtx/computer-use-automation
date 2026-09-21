@@ -26,13 +26,17 @@ with sync_playwright() as p:
         outputs=[{"name": "status", "type": "str", "source": "result page"}],
         checkpoint="result page shows SUCCESS",
         checkpoint_text="SUCCESS",
-        business_outcomes=[{"text": "NO SUCH MEMBER", "label": "member not found"}],
-        failure_patterns=[{"text": "ACCESS DENIED", "label": "permission denied"}],
+        business_outcomes=[
+            {"text": "NO SUCH MEMBER", "label": "member not found"},
+            {"text": "ACCESS DENIED", "label": "permission denied"},
+        ],
+        failure_patterns=[],
         value_params={"1001": "member_id"},
     )
 
-    # 3. replay three scenarios — no LLM in the loop, pure locator re-resolution.
-    cases = [("1001", "success"), ("9999", "business_outcome"), ("1002", "failure")]
+    # 3. replay scenarios — no LLM in the loop, pure locator re-resolution.
+    #    A page "error message" (ACCESS DENIED) is a business_outcome, not a failure.
+    cases = [("1001", "success"), ("9999", "business_outcome"), ("1002", "business_outcome")]
     for mid, expected in cases:
         page = browser.new_page()
         page.goto("http://localhost:9000/")
@@ -42,6 +46,16 @@ with sync_playwright() as p:
         print(f"  steps run: {len(run.steps)}")
         assert run.result == expected, f"member {mid}: expected {expected}, got {run.result}"
         page.close()
+
+    # 4. a genuine failure: a capability whose success checkpoint never appears
+    #    (no page "error message" involved) — replay times out and reports failure.
+    bad_cap = cap.model_copy(update={"checkpoint_text": "THIS TEXT NEVER APPEARS"})
+    page = browser.new_page()
+    page.goto("http://localhost:9000/")
+    run = replay(page, bad_cap, inputs={"member_id": "1001"})
+    print(f"\n=== replay with unreachable checkpoint → {run.result} ===")
+    assert run.result == "failure", f"expected failure, got {run.result}"
+    page.close()
 
     browser.close()
 

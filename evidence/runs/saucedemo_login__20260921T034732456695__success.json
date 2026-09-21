@@ -1,13 +1,10 @@
 {
   "capability": "saucedemo_login",
   "version": "1.0.0",
-  "inputs": {
-    "user-name": "enc:6qnYRRD2ADwkhFHoqzCgfqsfPXvDPl9UMjas/dSgY8yY43mjHOwpUoc=",
-    "password": "enc:wTeqaV+PEM3wQc8JCziIX3G3Jm5aEO7GhCLh9wn47A9awjMv/nlE2g=="
-  },
-  "result": "failure",
+  "inputs": {},
+  "result": "success",
   "outputs": {},
-  "diagnostic": "checkpoint not reached; expected page text containing 'Sauce Labs Backpack', got page of 161 chars",
+  "diagnostic": "",
   "steps": [
     {
       "step": 1,
@@ -29,6 +26,7 @@
     }
   ],
   "screenshot": null,
-  "started_at": "2026-09-20T17:08:15.743494Z",
-  "duration_ms": 158
+  "started_at": "2026-09-21T03:47:32.456695Z",
+  "duration_ms": 346,
+  "source": "admin"
 }

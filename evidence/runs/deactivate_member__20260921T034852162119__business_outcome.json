@@ -1,10 +1,8 @@
 {
   "capability": "deactivate_member",
   "version": "1.0.0",
-  "inputs": {
-    "member_id": "enc:S3q2hiAmeHNABwBDy8TG5j78+ILdMBxCqJCfo+MjHqA="
-  },
-  "result": "failure",
+  "inputs": {},
+  "result": "business_outcome",
   "outputs": {},
   "diagnostic": "permission denied",
   "steps": [
@@ -30,10 +28,11 @@
       "step": 4,
       "action": "click",
       "ok": true,
-      "outcome": "failure"
+      "outcome": "business_outcome"
     }
   ],
-  "screenshot": "/Users/daliu/computer-use-automation/dashboard/screenshots/deactivate_member_failure.png",
-  "started_at": "2026-09-21T01:10:47.140864Z",
-  "duration_ms": 470
+  "screenshot": null,
+  "started_at": "2026-09-21T03:48:52.162119Z",
+  "duration_ms": 561,
+  "source": "admin"
 }
