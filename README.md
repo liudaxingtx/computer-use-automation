@@ -48,7 +48,7 @@ Then open:
 | URL | Who it's for | What it does |
 |---|---|---|
 | `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, statistics report (per-task user-call rates + replay failed calls in a full result modal + reset all calls), AI-optimize any task conversationally, delete, register new tasks |
-| `http://localhost:8123/user` | **User runner** | Pick a task from a dropdown → fill its inputs → run → see the result |
+| `http://localhost:8123/user` | **User runner** (login-gated — see §4.7) | Pick a task from a dropdown → fill its inputs → run → see the result |
 
 ### 1.5 Demo path — discover a goal, then replay it
 
@@ -155,3 +155,19 @@ A maintainer tunes a task in plain English, not by hand-editing JSON: describe t
 ### 4.6 Task health
 
 Each task carries a three-state health signal — **verified / unverified / error** — anchored on `optimized_at` (only runs *after* the last optimize count). A single hard failure flips a task to **error**, highlighted red in admin and **hidden entirely from the user runner** until the maintainer optimizes it and a fresh run succeeds.
+
+### 4.7 User login & per-user isolation
+
+The `/user` runner is **login-gated**. Two mock users are pre-seeded (re-run `python3 scripts/init_users.py` to regenerate):
+
+| User | `/user` password | Legacy-app account |
+|---|---|---|
+| `alice` | `alice123` | `admin` |
+| `bob` | `bob123` | `bob_op` |
+
+Each user owns a private folder `users/<id>/`:
+
+- `profile.json` — login identity: `name`, `password_hash` (salted sha256, **never plaintext**), and the legacy-app username.
+- `credentials.json` — the legacy-app password, **AES-256-GCM encrypted** under a per-user key derived from the master key (`SHA-256(master ‖ user id)`), so one user's folder can't be decrypted with another's key.
+
+When a logged-in user runs a task whose inputs declare `username`/`password`, the replay injects that user's **own** legacy credential (decrypted only at the moment of use) — never a shared service account, and only when the user hasn't already supplied the value. Every run is stamped with `user_id`, so the audit log can answer "who did this, when".
