@@ -244,6 +244,11 @@
   .exbox .ptable { margin-bottom: 0; }
   .fill { background: rgba(56,189,248,0.12); color: var(--cyan); border: 1px solid rgba(56,189,248,0.35); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; white-space: nowrap; }
   .fill:hover { background: rgba(56,189,248,0.22); }
+  .ex-actions { margin-top: 8px; }
+  .ex-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .ex-form select, .ex-form input { background: var(--panel-2); border: 1px solid var(--line); color: var(--txt); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+  .ex-form input[type="text"] { flex: 1; min-width: 140px; }
+  .ex-form select:focus, .ex-form input:focus { border-color: rgba(56,189,248,0.5); box-shadow: 0 0 0 2px rgba(56,189,248,0.15); }
 
   .empty { color: var(--dim); font-size: 13px; padding: 14px 0; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -350,6 +355,17 @@
     </div>
     <div class="mdesc" id="replaySub"></div>
     <div id="replayBody"></div>
+  </div>
+</div>
+
+<div class="overlay" id="discoveroverlay">
+  <div class="modal" id="discovermodal" style="max-width:820px">
+    <div class="mhead">
+      <span class="mname">✓ Task recorded</span>
+      <button class="close" onclick="closeDiscover()">✕</button>
+    </div>
+    <div class="mdesc" id="discoverSub"></div>
+    <div id="discoverBody"></div>
   </div>
 </div>
 
@@ -478,7 +494,11 @@ function renderModal(t) {
           <td><span class="pill ${e.result}">${RESULT[e.result] || e.result}</span></td>
           <td><code>${esc(JSON.stringify(e.inputs))}</code></td>
           <td>${esc(e.note || '')}</td>
-          <td><button class="fill" onclick="fillExample(${i})">fill ▸</button></td>
+          <td>
+            <button class="fill" onclick="fillExample(${i})">fill</button>
+            <button class="fill" onclick="editExample(${i})">✎</button>
+            <button class="fill" style="color:var(--red);border-color:rgba(248,113,113,0.35)" onclick="removeExample(${i})">✕</button>
+          </td>
         </tr>`).join('')}
       </tbody>
     </table>` : '';
@@ -536,11 +556,22 @@ function renderModal(t) {
       </div>
       ${paramsTable ? `<div class="params">${paramsTable}</div>` : ''}
       <div class="inputs">${inputsHtml || '<span class="empty">This task takes no inputs.</span>'}</div>
-      ${examplesHtml ? `
-        <div class="exbox">
-          <div class="ex-title">Test cases — click "fill ▸" to load an input, then Execute</div>
-          ${examplesHtml}
-        </div>` : ''}
+      <div class="exbox">
+        <div class="ex-title">Test cases — click "fill ▸" to load an input, then Execute</div>
+        ${examplesHtml || '<div class="empty">No examples yet — add one below.</div>'}
+        <div class="ex-actions"><button class="fill" onclick="addExample()">+ Add example</button></div>
+        <div class="ex-form" id="exForm" style="display:none">
+          <select id="exResult">
+            <option value="success">success</option>
+            <option value="business_outcome">business_outcome</option>
+            <option value="failure">failure</option>
+          </select>
+          <input type="text" id="exInputs" placeholder='input values JSON, e.g. {"member_id": "1001"}'>
+          <input type="text" id="exNote" placeholder="what you'll see, e.g. JOHN SMITH · ACTIVE">
+          <button class="fill" onclick="saveExample()">Save</button>
+          <button class="fill" style="background:transparent;color:var(--dim)" onclick="cancelExample()">Cancel</button>
+        </div>
+      </div>
       <button class="run" style="margin-top:12px" onclick="runTest('${esc(t.name)}')">▶ Execute</button>
       <div class="result" id="result"></div>
     </div>
@@ -591,6 +622,68 @@ function fillExample(i) {
   toast('Inputs filled — press Execute to verify');
 }
 
+let editingExampleIndex = -1;  // -1 = adding a new example
+
+function addExample() {
+  editingExampleIndex = -1;
+  $('#exResult').value = 'success';
+  $('#exInputs').value = '';
+  $('#exNote').value = '';
+  $('#exForm').style.display = '';
+}
+
+function editExample(i) {
+  const ex = currentExamples[i];
+  if (!ex) return;
+  editingExampleIndex = i;
+  $('#exResult').value = ex.result || 'success';
+  $('#exInputs').value = JSON.stringify(ex.inputs || {});
+  $('#exNote').value = ex.note || '';
+  $('#exForm').style.display = '';
+}
+
+function cancelExample() { $('#exForm').style.display = 'none'; }
+
+async function saveExample() {
+  let inputs;
+  try { inputs = JSON.parse($('#exInputs').value.trim() || '{}'); }
+  catch (e) { toast('Inputs must be valid JSON'); return; }
+  const example = { inputs, result: $('#exResult').value, note: $('#exNote').value.trim() };
+  const action = editingExampleIndex >= 0 ? 'update' : 'add';
+  const index = editingExampleIndex;
+  try {
+    const res = await fetch('/api/examples', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: currentTaskName, action, index, example })
+    });
+    const r = await res.json();
+    if (r.ok) {
+      cancelExample();
+      toast(action === 'add' ? 'Example added' : 'Example updated');
+      openTask(currentTaskName);
+    } else {
+      toast('Error: ' + (r.error || 'save failed'));
+    }
+  } catch (e) {
+    toast('Error: ' + String(e));
+  }
+}
+
+async function removeExample(i) {
+  if (!confirm('Remove this example?')) return;
+  try {
+    const res = await fetch('/api/examples', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: currentTaskName, action: 'remove', index: i, example: {} })
+    });
+    const r = await res.json();
+    if (r.ok) { toast('Example removed'); openTask(currentTaskName); }
+    else { toast('Error: ' + (r.error || 'remove failed')); }
+  } catch (e) {
+    toast('Error: ' + String(e));
+  }
+}
+
 async function runTest(name) {
   const inputs = {};
   document.querySelectorAll('[data-input]').forEach(el => {
@@ -634,10 +727,7 @@ async function submitDiscover() {
   const name = $('#dname').value.trim();
   if (!task) { toast('Task description is required'); return; }
   const btn = $('#dbtn');
-  const box = $('#dresult');
-  btn.disabled = true; btn.textContent = 'Discovering… (can take ~30s)';
-  box.className = 'result'; box.style.display = 'block';
-  box.innerHTML = '<div class="rdiag">Running discovery… the agent is exploring the site.</div>';
+  btn.disabled = true; btn.textContent = 'Submitting…';
   try {
     const res = await fetch('/api/discover', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -646,27 +736,39 @@ async function submitDiscover() {
     const r = await res.json();
     btn.disabled = false; btn.textContent = '▶ Discover & record';
     if (!r.ok) {
-      box.className = 'result failure';
-      box.innerHTML = `<div class="rlabel">Failed</div><div class="rdiag">${esc(r.error || 'unknown error')}</div>`;
+      toast('Error: ' + (r.error || 'failed to start discovery'));
       return;
     }
-    box.className = 'result success';
-    const verifyLabel = RESULT[r.verify_result] || r.verify_result;
-    const outputsHtml = (r.verify_outputs && Object.keys(r.verify_outputs).length)
-      ? `<div class="outputs"><div class="olabel">Extracted data (verification run)</div><pre>${esc(JSON.stringify(r.verify_outputs, null, 2))}</pre></div>` : '';
-    box.innerHTML = `
-      <div class="rhead"><span class="rlabel">Recorded: ${esc(r.name)}</span></div>
-      <div class="rdiag">${r.steps} steps · checkpoint "${esc(r.checkpoint_text)}" · verified: ${verifyLabel}</div>
-      ${outputsHtml}
-      ${r.verify_diagnostic ? `<div class="rdiag">${esc(r.verify_diagnostic)}</div>` : ''}`;
-    loadTasks();
-    toast('Task recorded: ' + r.name);
+    // submitted — runs as a background job; close the modal immediately.
+    $('#doverlay').classList.remove('open');
+    toast('Discovery started — running in the background');
   } catch (e) {
     btn.disabled = false; btn.textContent = '▶ Discover & record';
-    box.className = 'result failure';
-    box.innerHTML = `<div class="rlabel">Error</div><div class="rdiag">${esc(String(e))}</div>`;
+    toast('Error: ' + String(e));
   }
 }
+
+function renderDiscoverResult(r) {
+  const verifyLabel = RESULT[r.verify_result] || r.verify_result;
+  const outputsHtml = (r.verify_outputs && Object.keys(r.verify_outputs).length)
+    ? `<div class="msection"><h3>Extracted data (verification run)</h3><pre style="background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--violet);overflow-x:auto;white-space:pre">${esc(JSON.stringify(r.verify_outputs, null, 2))}</pre></div>` : '';
+  $('#discoverSub').innerHTML = `
+    <span class="pill ${r.verify_result || ''}">${verifyLabel}</span>
+    <span class="ver">${esc(r.name || '')}</span>
+    <span class="rtime">${r.steps} steps</span>`;
+  $('#discoverBody').innerHTML = `
+    <div class="rdiag" style="display:block;margin:14px 0">checkpoint "${esc(r.checkpoint_text)}" — the task is recorded and was verified once.</div>
+    ${outputsHtml}
+    ${r.screenshot ? `<div class="msection"><h3>Screenshot (verification run)</h3><div class="shot"><img src="${esc(r.screenshot)}" alt="verification"></div></div>` : ''}
+    ${r.verify_diagnostic ? `<div class="rdiag">${esc(r.verify_diagnostic)}</div>` : ''}
+    <div class="opt-row" style="margin-top:18px">
+      <button class="opt-btn" onclick="closeDiscover(); openTask('${esc(r.name)}')">View task</button>
+      <button class="opt-btn" style="background:transparent;color:var(--dim)" onclick="closeDiscover()">Close</button>
+    </div>`;
+  $('#discoveroverlay').classList.add('open');
+}
+
+function closeDiscover() { $('#discoveroverlay').classList.remove('open'); }
 
 $('#overlay').addEventListener('click', e => { if (e.target === $('#overlay')) $('#overlay').classList.remove('open'); });
 $('#doverlay').addEventListener('click', e => { if (e.target === $('#doverlay')) $('#doverlay').classList.remove('open'); });
@@ -911,6 +1013,19 @@ async function refreshJobs() {
     for (const j of jobs) {
       if (j.status === 'running' || JOBS.notified.has(j.job_id)) continue;
       JOBS.notified.add(j.job_id);
+      if (j.type === 'discover') {
+        const r = j.result || {};
+        if (j.status === 'done' && r.ok) {
+          toast(`✓ Recorded ${r.name}`);
+          loadTasks();
+          renderDiscoverResult(r);
+        } else if (j.status === 'done') {
+          toast(`Discover failed: ${r.error || 'unknown error'}`);
+        } else if (j.status === 'error') {
+          toast(`Discover failed: ${j.error || ''}`);
+        }
+        continue;
+      }
       if (j.status === 'done') {
         const r = j.result || {};
         const changed = (r.changed && r.changed.length) ? r.changed.join(', ') : 'nothing';

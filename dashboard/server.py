@@ -453,72 +453,80 @@ def _optimize_task(name: str, instruction: str) -> dict:
     }
 
 
-# --- AI optimize as a long-running background job ----------------------------
-# Optimize jobs run in a background thread so a maintainer can close the tab
-# (or navigate away) and the LLM still finishes; the admin console polls the
-# registry and is notified when a job lands. The registry is guarded by a lock
-# because ThreadingHTTPServer serves concurrent requests.
-_OPT_JOBS: dict[str, dict] = {}
-_OPT_LOCK = threading.Lock()
+# --- Background jobs (AI optimize + discovery) -------------------------------
+# Long-running LLM tasks run in a background thread so a maintainer can close
+# the tab (or navigate away) and the LLM still finishes; the admin console polls
+# the registry and is notified when a job lands. One mechanism serves both AI
+# optimize and new-task discovery. The registry is guarded by a lock because
+# ThreadingHTTPServer serves concurrent requests.
+_JOBS: dict[str, dict] = {}
+_JOBS_LOCK = threading.Lock()
 _MAX_JOBS = 50
 
 
-def _optimize_async(name: str, instruction: str) -> dict:
-    """Submit an optimize as a long-running job. Returns immediately with a job
-    id; a worker thread persists the outcome for later polling."""
-    job_id = f"opt_{int(time.time() * 1000)}_{secrets.token_hex(3)}"
-    with _OPT_LOCK:
-        _OPT_JOBS[job_id] = {
+def _submit_job(job_type: str, name: str, runner, payload: dict) -> dict:
+    """Submit a background job. Returns immediately with a job id; a worker
+    thread persists the outcome for later polling."""
+    job_id = f"{job_type}_{int(time.time() * 1000)}_{secrets.token_hex(3)}"
+    with _JOBS_LOCK:
+        _JOBS[job_id] = {
             "job_id": job_id,
+            "type": job_type,
             "name": name,
-            "instruction": instruction,
             "status": "running",
             "started_at": time.time(),
             "finished_at": None,
             "result": None,
             "error": None,
         }
-    threading.Thread(target=_optimize_worker, args=(job_id, name, instruction),
+    threading.Thread(target=_job_worker, args=(job_id, runner, payload),
                      daemon=True).start()
-    return {"ok": True, "job_id": job_id, "name": name, "status": "running"}
+    return {"ok": True, "job_id": job_id, "type": job_type, "name": name,
+            "status": "running"}
 
 
-def _optimize_worker(job_id: str, name: str, instruction: str) -> None:
-    """Background worker: run the (slow) LLM optimize and record the outcome.
-    Runs to completion even if the submitting browser tab is closed."""
+def _job_worker(job_id: str, runner, payload: dict) -> None:
+    """Background worker: run the slow task and record the outcome. Runs to
+    completion even if the submitting browser tab is closed."""
     try:
-        result = _optimize_task(name, instruction)
-        with _OPT_LOCK:
-            _OPT_JOBS[job_id]["status"] = "done"
-            _OPT_JOBS[job_id]["result"] = result
-            _OPT_JOBS[job_id]["finished_at"] = time.time()
+        result = runner(**payload)
+        with _JOBS_LOCK:
+            _JOBS[job_id]["status"] = "done"
+            _JOBS[job_id]["result"] = result
+            _JOBS[job_id]["finished_at"] = time.time()
     except Exception as e:  # noqa: BLE001 — surface worker failure to the poller
-        with _OPT_LOCK:
-            _OPT_JOBS[job_id]["status"] = "error"
-            _OPT_JOBS[job_id]["error"] = str(e)
-            _OPT_JOBS[job_id]["finished_at"] = time.time()
+        with _JOBS_LOCK:
+            _JOBS[job_id]["status"] = "error"
+            _JOBS[job_id]["error"] = str(e)
+            _JOBS[job_id]["finished_at"] = time.time()
 
 
-def _optimize_status(job_id: str) -> dict:
-    with _OPT_LOCK:
-        job = _OPT_JOBS.get(job_id)
+def _optimize_async(name: str, instruction: str) -> dict:
+    """Submit an AI optimize as a long-running job."""
+    return _submit_job("optimize", name, _optimize_task,
+                       {"name": name, "instruction": instruction})
+
+
+def _job_status(job_id: str) -> dict:
+    with _JOBS_LOCK:
+        job = _JOBS.get(job_id)
         if not job:
-            return {"ok": False, "error": f"optimize job '{job_id}' not found"}
+            return {"ok": False, "error": f"job '{job_id}' not found"}
         return dict(job)
 
 
-def _optimize_jobs() -> dict:
-    """All known optimize jobs (newest first) for the admin's global indicator.
-    Prune old finished jobs so the in-memory registry never grows unbounded."""
-    with _OPT_LOCK:
-        if len(_OPT_JOBS) > _MAX_JOBS:
+def _jobs() -> dict:
+    """All known jobs (newest first) for the admin's global indicator. Prune
+    old finished jobs so the in-memory registry never grows unbounded."""
+    with _JOBS_LOCK:
+        if len(_JOBS) > _MAX_JOBS:
             finished = sorted(
-                (j for j in _OPT_JOBS.values() if j["status"] in ("done", "error")),
+                (j for j in _JOBS.values() if j["status"] in ("done", "error")),
                 key=lambda j: j["finished_at"] or 0,
             )
-            for j in finished[: len(_OPT_JOBS) - _MAX_JOBS]:
-                _OPT_JOBS.pop(j["job_id"], None)
-        jobs = list(_OPT_JOBS.values())
+            for j in finished[: len(_JOBS) - _MAX_JOBS]:
+                _JOBS.pop(j["job_id"], None)
+        jobs = list(_JOBS.values())
     jobs.sort(key=lambda j: j["started_at"], reverse=True)
     return {"jobs": jobs}
 
@@ -647,7 +655,36 @@ def _discover_task(url: str, task: str, name: str = "") -> dict:
         "verify_result": run.result,
         "verify_outputs": run.outputs,
         "verify_diagnostic": run.diagnostic,
+        "screenshot": f"/api/screenshots/run_{name}.png?t={int(time.time() * 1000)}",
     }
+
+
+def _discover_async(url: str, task: str, name: str) -> dict:
+    """Submit a new-task discovery as a long-running job."""
+    return _submit_job("discover", (name or task).strip() or "new task",
+                       _discover_task, {"url": url, "task": task, "name": name})
+
+
+def _edit_examples(name: str, action: str, index: int, example: dict) -> dict:
+    """Add / update / remove a runnable example on a task, so a maintainer can
+    accumulate a library of fixed, verified input→result cases over time."""
+    from agent.artifact import Example
+    cap = _load_capability(name)
+    examples = list(cap.examples)
+    if action == "add":
+        examples.append(Example(**example))
+    elif action in ("update", "remove"):
+        if not (0 <= index < len(examples)):
+            return {"ok": False, "error": f"example index {index} out of range"}
+        if action == "update":
+            examples[index] = Example(**example)
+        else:
+            examples.pop(index)
+    else:
+        return {"ok": False, "error": f"unknown action '{action}'"}
+    cap.examples = examples
+    (ARTIFACT_DIR / f"{name}.json").write_text(cap.model_dump_json(indent=2))
+    return {"ok": True, "examples": [e.model_dump() for e in cap.examples]}
 
 
 def build_tasks() -> dict:
@@ -697,10 +734,10 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/stats":
             self._json(_stats_json())
         elif path == "/api/optimize/jobs":
-            self._json(_optimize_jobs())
+            self._json(_jobs())
         elif path == "/api/optimize/status":
             job_id = (parse_qs(urlparse(self.path).query).get("job_id") or [""])[0]
-            self._json(_optimize_status(job_id))
+            self._json(_job_status(job_id))
         elif path.startswith("/api/task/"):
             name = unquote(path[len("/api/task/"):])
             try:
@@ -753,8 +790,15 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 self._json(_optimize_async(name, instruction))
             elif path == "/api/discover":
-                self._json(_discover_task(
+                self._json(_discover_async(
                     data.get("url", ""), data.get("task", ""), data.get("name", "")
+                ))
+            elif path == "/api/examples":
+                self._json(_edit_examples(
+                    data.get("task", ""),
+                    data.get("action", "add"),
+                    int(data.get("index", -1)),
+                    data.get("example") or {},
                 ))
             else:
                 self._json({"error": "not found"}, 404)
