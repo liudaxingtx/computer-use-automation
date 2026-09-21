@@ -185,6 +185,17 @@
   .enc { font-family: ui-monospace, Menlo, monospace; color: var(--violet); font-size: 11px; word-break: break-all; }
   .enc-lock { color: var(--dim); font-size: 11.5px; }
 
+  /* AI optimize */
+  .opt-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .opt-row input { flex: 1; background: var(--panel-2); border: 1px solid var(--line); color: var(--txt);
+    border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; }
+  .opt-row input:focus { border-color: rgba(167,139,250,0.5); box-shadow: 0 0 0 2px rgba(167,139,250,0.15); }
+  button.opt-btn { background: linear-gradient(135deg, var(--violet), #7c3aed); color: #fff; border: none;
+    font-weight: 700; font-size: 13px; padding: 10px 16px; border-radius: 9px; cursor: pointer;
+    white-space: nowrap; box-shadow: 0 0 16px rgba(167,139,250,0.4); }
+  button.opt-btn:hover { filter: brightness(1.08); }
+  button.opt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
   /* delete + confirm */
   button.danger { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.4);
     font-weight: 700; font-size: 12.5px; padding: 6px 14px; border-radius: 8px; cursor: pointer; }
@@ -489,6 +500,16 @@ function renderModal(t) {
     </div>
 
     <div class="msection">
+      <h3>AI optimize</h3>
+      <div class="mdesc">Describe the fix in plain English — the AI adjusts outputs, checkpoint, or outcome patterns and re-saves the task.</div>
+      <div class="opt-row">
+        <input type="text" id="optInstruction" placeholder="e.g. outputs are null — read the h2 heading and #flash message">
+        <button class="opt-btn" onclick="optimizeTask('${esc(t.name)}')">✨ Optimize</button>
+      </div>
+      <div class="result" id="optResult"></div>
+    </div>
+
+    <div class="msection">
       <h3>Replayable path & locators</h3>
       ${stepsHtml || '<div class="empty">No steps.</div>'}
     </div>
@@ -690,6 +711,28 @@ async function replayRun(runId, btn) {
     toast('Error: ' + String(e));
   } finally {
     btn.disabled = false; btn.textContent = '↻ Replay';
+  }
+}
+
+async function optimizeTask(name) {
+  const instruction = $('#optInstruction').value.trim();
+  if (!instruction) { toast('Describe the change first'); return; }
+  const btn = document.querySelector('.opt-btn');
+  btn.disabled = true; btn.textContent = 'Optimizing…';
+  try {
+    const res = await fetch('/api/optimize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: name, instruction })
+    });
+    const r = await res.json();
+    btn.disabled = false; btn.textContent = '✨ Optimize';
+    if (r.error) { toast('Error: ' + r.error); return; }
+    const changed = (r.changed && r.changed.length) ? r.changed.join(', ') : 'nothing';
+    toast(`Optimized ${r.name}: ${changed}${r.explanation ? ' — ' + r.explanation : ''}`);
+    openTask(name);  // refresh so the new outputs/checkpoint show
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '✨ Optimize';
+    toast('Error: ' + String(e));
   }
 }
 

@@ -321,6 +321,102 @@ def _stats_json() -> dict:
     }
 
 
+def _optimize_task(name: str, instruction: str) -> dict:
+    """AI-assisted artifact tuning. Pass the current artifact + a maintainer's
+    natural-language instruction to the decision LLM, which returns a structured
+    patch (outputs / checkpoint / business_outcomes / failure_patterns). Apply it
+    (pydantic-validated), persist, and report what changed — so a maintainer can
+    fix a bad output extractor or a wrong success signal by just describing it."""
+    from agent.llm import decide
+
+    cap = _load_capability(name)
+
+    recent = []
+    for run in ReplayStore().list_runs():
+        if run.capability == name:
+            recent.append({
+                "result": run.result,
+                "diagnostic": run.diagnostic,
+                "outputs": run.outputs,
+                "started_at": run.started_at.isoformat(),
+            })
+    recent = recent[-5:]
+
+    system = (
+        "You maintain computer-use automation artifacts (a 'Capability'). "
+        "Given the current artifact and a maintainer's instruction, return a JSON "
+        "object describing exactly which fields to change. Include ONLY fields you "
+        "are actually changing; omit everything else.\n\n"
+        "Return shape:\n"
+        '{\n'
+        '  "explanation": "one or two sentences on what you changed and why",\n'
+        '  "outputs": [{"name": str, "type": "str", "source": str, "label": str, "extract": str}],\n'
+        '  "checkpoint_text": "exact page text that signals success",\n'
+        '  "checkpoint": "human-readable goal",\n'
+        '  "business_outcomes": [{"text": str, "label": str}],\n'
+        '  "failure_patterns": [{"text": str, "label": str}]\n'
+        "}\n\n"
+        "Rules:\n"
+        "- outputs[].extract must be a real CSS selector (e.g. \"h2\", \"#flash\", \".title\") "
+        "whenever the value is read from a specific element; leave it \"\" only for key-value "
+        "table extraction where label matches the on-page field.\n"
+        "- checkpoint_text must be literal text that appears on the page on success.\n"
+        "- business_outcomes are legitimate expected answers (e.g. \"no such member\"); "
+        "failure_patterns are hard errors (e.g. \"access denied\").\n"
+        "- Do not invent fields; only change what the instruction asks for."
+    )
+
+    user = (
+        f"Current artifact:\n{cap.model_dump_json(indent=2)}\n\n"
+        f"Recent run results:\n{json.dumps(recent, indent=2, default=str)}\n\n"
+        f"Maintainer instruction:\n{instruction}\n"
+    )
+
+    result = decide([
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ])
+
+    explanation = result.get("explanation", "")
+    patch = {k: v for k, v in result.items()
+             if k != "explanation" and v is not None and v != ""}
+
+    # List fields merge by key (name / text), not replace — the LLM often
+    # returns only the *new* item, and we must not drop the existing ones.
+    _merge_key = {"outputs": "name", "business_outcomes": "text",
+                  "failure_patterns": "text"}
+    for field, key in _merge_key.items():
+        if field not in patch:
+            continue
+        existing = {getattr(e, key): e.model_dump() for e in getattr(cap, field)}
+        for item in patch[field]:
+            if isinstance(item, dict) and item.get(key):
+                existing[item[key]] = item
+        patch[field] = list(existing.values())
+
+    if not patch:
+        return {"ok": True, "name": name, "explanation": explanation,
+                "changed": [], "note": "no fields changed"}
+
+    # Validate through the schema (raises on a bad patch) and persist.
+    from agent.artifact import Capability
+    try:
+        new_cap = Capability.model_validate({**cap.model_dump(), **patch})
+    except Exception as e:  # noqa: BLE001 — surface an invalid AI patch, don't crash
+        return {"ok": False, "error": f"AI returned an invalid patch: {e}",
+                "explanation": explanation}
+    (ARTIFACT_DIR / f"{name}.json").write_text(new_cap.model_dump_json(indent=2))
+
+    return {
+        "ok": True,
+        "name": name,
+        "explanation": explanation,
+        "changed": list(patch.keys()),
+        "outputs": [o.model_dump() for o in new_cap.outputs],
+        "checkpoint_text": new_cap.checkpoint_text,
+    }
+
+
 def _delete_task(name: str) -> dict:
     """Delete a recorded task and everything tied to it: the artifact, the
     discovery transcript, and every recorded run (call history).
@@ -517,6 +613,13 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"error": "run_id required"}, 400)
                     return
                 self._json(_rerun_task(run_id))
+            elif path == "/api/optimize":
+                name = data.get("task")
+                instruction = (data.get("instruction") or "").strip()
+                if not name or not instruction:
+                    self._json({"error": "task and instruction required"}, 400)
+                    return
+                self._json(_optimize_task(name, instruction))
             elif path == "/api/discover":
                 self._json(_discover_task(
                     data.get("url", ""), data.get("task", ""), data.get("name", "")
