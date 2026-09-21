@@ -578,6 +578,55 @@ def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")[:40]
 
 
+def _rename_task(old_name: str, new_name: str) -> dict:
+    """Rename a task and everything tied to it: the artifact file + meta.name,
+    the discovery transcript, every recorded run (filename + capability field),
+    and its screenshots."""
+    old_name = (old_name or "").strip()
+    new_name = (new_name or "").strip()
+    if not old_name or not new_name:
+        return {"ok": False, "error": "old and new names are required"}
+    new_name = re.sub(r"[^a-zA-Z0-9_-]+", "_", new_name).strip("_")[:60]
+    if not new_name:
+        return {"ok": False, "error": "name must contain at least one letter or digit"}
+    if new_name == old_name:
+        return {"ok": True, "name": new_name, "changed": False}
+    if not (ARTIFACT_DIR / f"{old_name}.json").exists():
+        return {"ok": False, "error": f"task '{old_name}' not found"}
+    if (ARTIFACT_DIR / f"{new_name}.json").exists():
+        return {"ok": False, "error": f"a task named '{new_name}' already exists"}
+
+    # artifact — rewrite under the new name with meta.name updated
+    cap = _load_capability(old_name)
+    cap.meta.name = new_name
+    (ARTIFACT_DIR / f"{new_name}.json").write_text(cap.model_dump_json(indent=2))
+    (ARTIFACT_DIR / f"{old_name}.json").unlink()
+
+    # discovery transcript
+    disc_old = EVIDENCE_DIR / f"discovery_{old_name}.json"
+    if disc_old.exists():
+        disc_old.rename(EVIDENCE_DIR / f"discovery_{new_name}.json")
+
+    # runs — patch the capability field, then rename the file prefix
+    if RUNS_DIR.exists():
+        for f in list(RUNS_DIR.glob(f"{old_name}__*.json")):
+            try:
+                data = json.loads(f.read_text())
+                data["capability"] = new_name
+                f.write_text(json.dumps(data, indent=2))
+            except Exception:
+                pass
+            f.rename(RUNS_DIR / f"{new_name}__{f.name.split('__', 1)[1]}")
+
+    # screenshots — the verification shot and any SHOT_MAP entry
+    for f in list(SHOTS.glob(f"run_{old_name}.png")):
+        f.rename(SHOTS / f"run_{new_name}.png")
+    if old_name in SHOT_MAP:
+        SHOT_MAP[new_name] = SHOT_MAP.pop(old_name)
+
+    return {"ok": True, "name": new_name, "changed": True}
+
+
 def _discover_task(url: str, task: str, name: str = "") -> dict:
     """Run a full discovery -> auto-record -> verify pipeline for a new task.
 
@@ -799,6 +848,10 @@ class Handler(BaseHTTPRequestHandler):
                     data.get("action", "add"),
                     int(data.get("index", -1)),
                     data.get("example") or {},
+                ))
+            elif path == "/api/rename":
+                self._json(_rename_task(
+                    data.get("task", ""), data.get("new_name", "")
                 ))
             else:
                 self._json({"error": "not found"}, 404)

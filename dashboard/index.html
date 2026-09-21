@@ -539,7 +539,8 @@ function renderModal(t) {
 
   $('#modal').innerHTML = `
     <div class="mhead">
-      <span class="mname">${esc(t.name)}</span>
+      <span class="mname" id="taskName">${esc(t.name)}</span>
+      <button class="fill" onclick="startRename()" title="Rename">✎</button>
       <span class="ver">v${esc(t.version)}</span>
       <span class="badge verified" style="background:rgba(56,189,248,0.12);color:var(--cyan)">${esc(t.domain || 'unknown')}</span>
       <button class="danger" onclick="askDelete('${esc(t.name)}')">Delete</button>
@@ -681,6 +682,47 @@ async function removeExample(i) {
     else { toast('Error: ' + (r.error || 'remove failed')); }
   } catch (e) {
     toast('Error: ' + String(e));
+  }
+}
+
+function startRename() {
+  const name = currentTaskName;
+  $('#taskName').innerHTML = `<input type="text" id="renameInput" value="${esc(name)}">`;
+  const inp = $('#renameInput');
+  inp.focus();
+  inp.select();
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveRename();
+    else if (e.key === 'Escape') cancelRename(name);
+  });
+}
+
+function cancelRename(name) {
+  const el = $('#taskName');
+  if (el) el.textContent = name;
+}
+
+async function saveRename() {
+  const inp = $('#renameInput');
+  const newName = (inp ? inp.value : '').trim();
+  if (!newName || newName === currentTaskName) { cancelRename(currentTaskName); return; }
+  try {
+    const res = await fetch('/api/rename', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task: currentTaskName, new_name: newName })
+    });
+    const r = await res.json();
+    if (r.ok) {
+      toast('Renamed to ' + r.name);
+      loadTasks();
+      openTask(r.name);
+    } else {
+      toast('Error: ' + (r.error || 'rename failed'));
+      cancelRename(currentTaskName);
+    }
+  } catch (e) {
+    toast('Error: ' + String(e));
+    cancelRename(currentTaskName);
   }
 }
 
