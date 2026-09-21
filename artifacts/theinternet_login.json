@@ -24,25 +24,18 @@
   ],
   "outputs": [
     {
-      "name": "logged_in",
+      "name": "heading",
       "type": "str",
       "source": "result page",
-      "label": "logged_in",
-      "extract": ""
+      "label": "heading",
+      "extract": "h2"
     },
     {
       "name": "page_message",
       "type": "str",
       "source": "result page",
       "label": "page_message",
-      "extract": ""
-    },
-    {
-      "name": "heading",
-      "type": "str",
-      "source": "result page",
-      "label": "heading",
-      "extract": ""
+      "extract": "#flash"
     }
   ],
   "checkpoint": "goal reached",
