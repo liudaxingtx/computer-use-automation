@@ -47,7 +47,7 @@ Then open:
 
 | URL | Who it's for | What it does |
 |---|---|---|
-| `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, call log, delete, register new tasks |
+| `http://localhost:8123/` | **Admin console** | Manage tasks, view locator detail + screenshots, run/verify, statistics report (per-task rates + one-click replay), delete, register new tasks |
 | `http://localhost:8123/user` | **User runner** | Pick a task from a dropdown → fill its inputs → run → see the result |
 
 ### 1.5 Test suite
@@ -127,7 +127,7 @@ Every invocation is **recorded, measured, and re-runnable**:
 - **Real-time rates.** The telemetry layer aggregates, per task + version: `success`, `business_outcome`, `failure` counts and their **rates** (`success_rate`, `business_rate`, **`failure_rate`**). So yes — if a task starts erroring, the error rate is visible immediately.
 - **Failure inbox.** Every non-success run lands in an unresolved-failures inbox; a maintainer marks them resolved after a fix.
 - **Replay-the-error loop.** Any failure can be re-run deterministically with its exact original inputs to reproduce and verify a fix.
-- **Call log (admin console).** A live view of every invocation: how many times each task ran, whether it succeeded, and the exact inputs used — including failures.
+- **Statistics report (admin console).** A live report that aggregates, per task, the `success` / `business_outcome` / `failure` counts **and rates** (with a rate bar), then lists every invocation: successes show timestamp + duration + extracted numbers, failures show the **encrypted** input (`enc:…`, never decrypted in the report) + diagnostic. Every row has a **↻ Replay** button that re-runs that exact invocation with its original inputs.
 
 ### 3.3 Privacy & encryption
 
@@ -135,6 +135,7 @@ Customer-entered values are treated as secrets end to end:
 
 - **AES-256-GCM encryption at rest.** Every input value is encrypted *before* it touches disk; the run log and artifacts never store plaintext customer data.
 - **Decrypt only at the moment of use.** Replay decrypts an input solely to type it into the target form, then it is gone.
+- **The report never reveals decrypted failure inputs.** A failed run appears in the admin report as ciphertext (`enc:…`); replaying it decrypts server-side only at the moment of use, so even an operator reading the report never sees the customer's raw value.
 - **Per-tenant keys.** The master key derives a separate key per tenant (`SHA-256(master ‖ tenant)`), so one tenant's data is unreadable with another's key.
 - **Authenticated encryption.** Wrong key or tampering raises — ciphertext can't silently decrypt to garbage.
 - **Key never committed.** The master key lives in the environment (or a KMS in production), never in the repo.
