@@ -80,10 +80,11 @@ Depth over breadth, applied to the load-bearing pieces (artifact schema, determi
 - **No interactive operator UI** — the handoff state machine is real; the human-drives-the-live-session loop is stubbed (see §5).
 - **No commercial production target** — proven against a deliberately-hostile local mock (1998-era banking portal: table layouts, no test IDs, multi-modal outcomes) plus the public SauceDemo / The Internet sandboxes; never real credentials or PII.
 
-**Future work.** With more time, two things lead:
+**Future work.** With more time, three things lead:
 
 - **Closed-loop repair.** Today the fix loop is human-steered: a maintainer notices a failed task, replays the failing case, describes the fix to the AI optimizer, and re-runs until it passes. That loop can be automated end-to-end, because the system already holds the verification data it needs — the recorded failure, its exact inputs, and the `expect` assertion. On a hard failure it can auto-replay, ask the decision model for a patch, re-run, and verify, iterating until the case passes or control is handed to a human. The primitives exist (Replay, AI optimize, version bump, `expect`); only the orchestration loop is new.
 - **Per-task regression tests.** Runnable examples already carry `expect` assertions — they are test cases in disguise. The missing piece is a runner that executes every example as a test and reports pass/fail per task, so a fix is proven against all known cases rather than only the one that failed. Newly-discovered failing cases should be auto-captured into that set: a failing invocation becomes a regression test.
+- **Per-user access control (RBAC).** Today the user system isolates users at the *data* level — each user's credentials and bound identity fields are private — but not yet at the *capability* level: every logged-in user can run every non-error task. The natural extension is a role/permission on the user's profile plus an optional allowed-roles constraint on a task, so the runner exposes only the tasks a user is permitted to run (a viewer can look up a member but not deactivate one; an operator can do both).
 
 Also on the list: capability dedup, automatic error-state discovery, generalized output extraction, and the queue/browser-pool layer for multi-tenant scale.
 

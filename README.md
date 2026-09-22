@@ -201,3 +201,7 @@ Only the orchestration loop is new — Replay, AI optimize, version bump, and `e
 ### 5.2 Per-task regression tests
 
 Runnable examples already carry `expect` assertions — they are test cases in disguise. What's missing is a runner that executes every example as a test and reports pass/fail per task, so a fix is proven against *all* known cases rather than only the one that failed. Combined with 5.1, a newly-discovered failing case should be auto-captured into that set — a failing invocation becomes a permanent regression test.
+
+### 5.3 Per-user access control (RBAC)
+
+Per-user isolation today is at the *data* level — each user's credentials and bound identity fields are private. It is not yet at the *capability* level: every logged-in user can run every non-error task. The natural extension is a role/permission on the user's profile plus an optional allowed-roles constraint on a task, so the runner exposes only the tasks a user is permitted to run (a viewer can look up a member but not deactivate one; an operator can do both).
