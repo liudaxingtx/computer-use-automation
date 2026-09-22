@@ -181,3 +181,23 @@ Some inputs are private to each user and must never be typed by them (a member i
 - **Spoof-proof** — the server always overrides a caller-supplied value with the bound one, so a user can't look up someone else's member id.
 
 Two distinct mechanisms cover private data: legacy `username`/`password` come from `credentials.json` (encrypted); everything else (member id, employee id, department) is a `bind` into `userBO`. The shipped demo binds `lookup_member.member_id ← userBO.eeID`, so alice resolves to member **1001** (JOHN SMITH) and bob to **1002** (JANE DOE) without either typing a member id. `GET /api/userdata-schema` lists the bindable fields; `POST /api/bind` sets or clears a binding.
+
+## 5. Future work
+
+Two concrete next steps, both building on pieces that already exist.
+
+### 5.1 Closed-loop repair
+
+Today the repair loop is human-steered: a maintainer sees a task flip to `error`, replays the failing case from the run ledger, describes the fix to **AI optimize**, and re-runs until it passes. That loop can be automated end-to-end, because every failure already carries exactly what the automation needs — the recorded invocation, its exact inputs, and (optionally) the `expect` assertion:
+
+1. a hard failure is detected (a task flips to `error`),
+2. the system auto-replays the failing invocation,
+3. the decision model proposes a patch (the same structured patch **AI optimize** emits today),
+4. the patch is validated, version-bumped, and re-run,
+5. loop until the case passes or control is handed to a human.
+
+Only the orchestration loop is new — Replay, AI optimize, version bump, and `expect` already exist.
+
+### 5.2 Per-task regression tests
+
+Runnable examples already carry `expect` assertions — they are test cases in disguise. What's missing is a runner that executes every example as a test and reports pass/fail per task, so a fix is proven against *all* known cases rather than only the one that failed. Combined with 5.1, a newly-discovered failing case should be auto-captured into that set — a failing invocation becomes a permanent regression test.
