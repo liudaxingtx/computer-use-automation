@@ -40,8 +40,8 @@ MEMBERS = {
 # has a known good credential; register adds more at runtime. `bob_op` gives the
 # second demo user a distinct legacy identity for per-user isolation.
 USERS = {
-    "admin": {"password": "secret123", "email": "admin@fiserv.com"},
-    "bob_op": {"password": "bobpass123", "email": "bob@fiserv.com"},
+    "admin": {"password": "secret123", "email": "admin@example.com"},
+    "bob_op": {"password": "bobpass123", "email": "bob@example.com"},
 }
 
 
@@ -59,7 +59,7 @@ def page(title, body):
         + body +
         "\n</td></tr>\n"
         '<tr><td bgcolor="#000080" height="20"><font color="#ffffff" size="1">'
-        "&nbsp;&copy; 1998 FISERV BANKING CORP</font></td></tr>\n"
+        "&nbsp;&copy; 1998 LEGACY BANKING CORP</font></td></tr>\n"
         "</table></body></html>"
     )
 
@@ -285,6 +285,20 @@ class Handler(BaseHTTPRequestHandler):
         print("[mock]", format % args)
 
 
+class _HTTPServer(HTTPServer):
+    """HTTPServer that skips HTTPServer.server_bind's reverse-DNS lookup
+    (socket.getfqdn), which can hang indefinitely on macOS when mDNSResponder
+    doesn't answer — leaving the socket in CLOSED, never LISTEN. server_name is
+    only used for logging, so set it to the raw host string instead."""
+
+    def server_bind(self):
+        import socketserver
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = str(host)
+        self.server_port = port
+
+
 if __name__ == "__main__":
     print(f"Legacy Member Services running on http://localhost:{PORT}")
-    HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    _HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
